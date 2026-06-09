@@ -9,8 +9,12 @@
  *   { action: 'RESTORE_SESSION', payload: { id } }            → { ok }
  *   { action: 'DELETE_SESSION',  payload: { id } }            → { ok }
  *   { action: 'GET_SESSIONS' }                                 → { sessions }
+ *   { action: 'SEARCH_SESSIONS', payload: { query } }         → { sessions }
  *   { action: 'GET_SETTINGS' }                                 → { settings }
  *   { action: 'UPDATE_SETTINGS', payload: { ...partial } }    → { settings }
+ *   { action: 'EXPORT_DATA' }                                  → { data }
+ *   { action: 'IMPORT_DATA',     payload: { blob, mode? } }   → { imported, skipped }
+ *   { action: 'GET_STORAGE_USAGE' }                            → { used, quota, percent }
  */
 
 import {
@@ -19,6 +23,11 @@ import {
   deleteSession,
   getSettings,
   updateSettings,
+  searchSessions,
+  exportData,
+  importData,
+  getStorageUsage,
+  migrateIfNeeded,
 } from '../storage/storage.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -128,6 +137,10 @@ async function handleMessage({ action, payload = {} }) {
       const sessions = await getAllSessions();
       return { sessions };
     }
+    case 'SEARCH_SESSIONS': {
+      const sessions = await searchSessions(payload.query ?? '');
+      return { sessions };
+    }
     case 'GET_SETTINGS': {
       const settings = await getSettings();
       return { settings };
@@ -138,6 +151,18 @@ async function handleMessage({ action, payload = {} }) {
       const settings = await getSettings();
       return { settings };
     }
+    case 'EXPORT_DATA': {
+      const data = await exportData();
+      return { data };
+    }
+    case 'IMPORT_DATA': {
+      const result = await importData(payload.blob, payload.mode);
+      return result;
+    }
+    case 'GET_STORAGE_USAGE': {
+      const usage = await getStorageUsage();
+      return usage;
+    }
     default:
       throw new Error(`Unknown action: ${action}`);
   }
@@ -146,6 +171,7 @@ async function handleMessage({ action, payload = {} }) {
 // ─── Startup ──────────────────────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(async () => {
+  await migrateIfNeeded();
   await scheduleAutosave();
 });
 

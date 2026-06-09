@@ -293,26 +293,37 @@ export async function exportSessionAsText(id) {
 }
 
 /**
- * Serialises all sessions + settings to a plain JS object ready to be
- * JSON.stringify-ed or handed to the File API for download.
+ * Serialises everything needed to fully restore a vault — sessions, settings,
+ * and the user's organization (folders + smart folders) — into a plain object
+ * ready to be JSON.stringify-ed or handed to the File API. Tags live on the
+ * sessions, so they ride along automatically.
  */
 export async function exportData() {
-  const [sessions, settings] = await Promise.all([getAllSessions(), getSettings()]);
+  const [sessions, settings, { folders = {} }, { smartFolders = {} }] = await Promise.all([
+    getAllSessions(),
+    getSettings(),
+    _read('folders'),
+    _read('smartFolders'),
+  ]);
   return {
     _exportedAt: Date.now(),
     _schemaVersion: SCHEMA_VERSION,
     sessions,
     settings,
+    folders,
+    smartFolders,
   };
 }
 
 /**
  * Merges an imported data blob into local storage.
  * mode:
- *   'merge'   — keeps existing sessions, adds/overwrites from import (default)
- *   'replace' — clears sessions first, then imports
+ *   'merge'   — keeps existing data, adds/overwrites from import (default)
+ *   'replace' — clears sessions/folders/smartFolders first, then imports
  *
- * Returns { imported: number, skipped: number }.
+ * Folders and smart folders are restored too when present, so a backup never
+ * loses the user's organization. Returns { imported: number, skipped: number }
+ * (session counts).
  */
 export async function importData(blob, mode = 'merge') {
   if (!blob || typeof blob !== 'object') throw new Error('Invalid import file');
@@ -335,6 +346,16 @@ export async function importData(blob, mode = 'merge') {
 
   if (blob.settings && mode === 'replace') {
     await _write({ settings: blob.settings });
+  }
+
+  if (blob.folders && typeof blob.folders === 'object') {
+    const base = mode === 'replace' ? {} : (await _read('folders')).folders ?? {};
+    await _write({ folders: { ...base, ...blob.folders } });
+  }
+
+  if (blob.smartFolders && typeof blob.smartFolders === 'object') {
+    const base = mode === 'replace' ? {} : (await _read('smartFolders')).smartFolders ?? {};
+    await _write({ smartFolders: { ...base, ...blob.smartFolders } });
   }
 
   return { imported, skipped };

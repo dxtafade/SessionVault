@@ -187,6 +187,33 @@ describe('export / import', () => {
     );
     expect(await store.exportSessionAsText('a')).toBe('https://x.com\nhttps://y.com');
   });
+
+  it('export includes folders + smartFolders; import restores them', async () => {
+    await store.saveSession(makeSession('a', 'A'));
+    const folder = await store.createFolder('Work');
+    await chrome.storage.local.set({ smartFolders: { sf1: { id: 'sf1', name: 'Dev' } } });
+
+    const blob = JSON.parse(JSON.stringify(await store.exportData()));
+    expect(blob.folders[folder.id]).toBeDefined();
+    expect(blob.smartFolders.sf1).toBeDefined();
+
+    // Wipe organization, then restore from the backup.
+    await chrome.storage.local.set({ folders: {}, smartFolders: {} });
+    await store.importData(blob, 'replace');
+
+    expect(await store.getFolder(folder.id)).not.toBeNull();
+    const { smartFolders } = await chrome.storage.local.get('smartFolders');
+    expect(smartFolders.sf1).toBeDefined();
+  });
+
+  it('merge-imports folders without dropping existing ones', async () => {
+    const keep = await store.createFolder('Keep');
+    const blob = { sessions: {}, folders: { f2: { id: 'f2', name: 'New', createdAt: 1, updatedAt: 1 } } };
+    await store.importData(blob, 'merge');
+
+    const folders = await store.getFolders();
+    expect(Object.keys(folders).sort()).toEqual([keep.id, 'f2'].sort());
+  });
 });
 
 // ─── Storage usage ──────────────────────────────────────────────────────────────

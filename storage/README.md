@@ -5,9 +5,10 @@ call these functions — they never touch `chrome.storage` directly.
 
 - [`storage.js`](storage.js) — sessions, settings, search, dedup, trash, lock, folders, tags, archive, export/import, stats
 - [`file-transfer.js`](file-transfer.js) — JSON/gzip file download/upload (popup context)
+- [`smart-folders.js`](smart-folders.js) — rule-driven dynamic session grouping (Pro)
 - [`gzip.js`](gzip.js) — gzip + base64 helpers (shared by archive + file-transfer)
 - [`crypto.js`](crypto.js) — client-side encryption for sync (see [`docs/CRYPTO_CONTRACT.md`](../docs/CRYPTO_CONTRACT.md))
-- Tests: `*.test.js` in this folder — run `npm test` (77 tests)
+- Tests: `*.test.js` in this folder — run `npm test` (94 tests)
 
 > **Storage owns these files only.** Wiring any of this into the message API
 > (`background/service-worker.js`) is the Core Engine's job.
@@ -134,8 +135,8 @@ Storage keys: `sessions`, `settings`, `trash`, `folders`, `archive`, `_schemaVer
 ### Export / import
 | Function | Returns | Notes |
 |---|---|---|
-| `exportData()` | `{ _exportedAt, _schemaVersion, sessions, settings }` | |
-| `importData(blob, mode = 'merge')` | `{ imported, skipped }` | `mode`: `'merge'` \| `'replace'`; skips malformed |
+| `exportData()` | `{ _exportedAt, _schemaVersion, sessions, settings, folders, smartFolders }` | Full vault incl. organization (tags ride on sessions) |
+| `importData(blob, mode = 'merge')` | `{ imported, skipped }` | `mode`: `'merge'` \| `'replace'`; restores folders + smartFolders too; skips malformed sessions |
 | `exportSessionAsText(id)` | `string` | Tab URLs, newline-separated |
 
 ### Stats & maintenance
@@ -204,10 +205,37 @@ importBtn.addEventListener('click', async () => {
 });
 ```
 
+## `smart-folders.js` API
+
+Rule-driven dynamic grouping (Pro). A smart folder stores rules and computes its
+members live — nothing is written onto sessions. Stored under key `smartFolders`.
+
+```ts
+RuleGroup { match: 'all' | 'any', conditions: Condition[] }
+Condition { field, op, value }
+  string fields  : name | url | title | tag   ops: contains|equals|startsWith|endsWith
+  number fields  : tabCount | createdAt        ops: eq|gt|gte|lt|lte
+  boolean fields : isAuto                       ops: eq
+// url/title/tag are multi-valued (any tab/tag matches); strings are case-insensitive
+```
+
+| Function | Returns | Notes |
+|---|---|---|
+| `matchSession(session, rules)` | `boolean` | Pure — use for live UI previews |
+| `validateRules(rules)` | `true` | Throws on a malformed rule group |
+| `getSmartFolders()` / `getSmartFolder(id)` | map / `SmartFolder\|null` | |
+| `createSmartFolder(name, rules, { color? })` | `SmartFolder` | Validates rules |
+| `updateSmartFolder(id, partial)` | `SmartFolder` | Re-validates if `rules` changes |
+| `deleteSmartFolder(id)` | `void` | |
+| `evaluateSmartFolder(id)` | `Session[]` | Members, newest-first |
+| `previewRules(rules)` | `Session[]` | Evaluate ad-hoc rules without saving |
+| `getSmartFolderCounts()` | `{ [id]: number }` | Member counts for badges |
+
 ## Pending Core Engine wiring
 
 Trash, lock, search, export/import, stats, and migration are already wired by
-Dexter (Core) as of `98a8475`.
+Dexter (Core) as of `98a8475`. Encrypted-sync crypto (`crypto.js`) is wired to
+the contract; Dexter swaps the `sync.js` stubs.
 
 Still no message-API action — for Dexter to add to `background/service-worker.js`
 when the UI needs them:
@@ -215,5 +243,7 @@ when the UI needs them:
 - **Folders:** `createFolder`, `renameFolder`, `deleteFolder`, `getFolders`,
   `assignSessionToFolder`, `getSessionsInFolder`
 - **Tags:** `addTag`, `removeTag`, `getAllTags`, `getSessionsByTag`
+- **Smart folders:** `createSmartFolder`, `updateSmartFolder`, `deleteSmartFolder`,
+  `getSmartFolders`, `evaluateSmartFolder`, `previewRules`, `getSmartFolderCounts`
 - **Archive:** `archiveSession`, `restoreArchived`, `deleteArchived`,
   `listArchived`, `autoArchiveOldSessions` (good candidate for a startup/alarm call)

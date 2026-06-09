@@ -17,6 +17,12 @@
   padding: 0;
 }
 
+/* The [hidden] attribute must always win, even over rules like
+   .modal-overlay { display: flex } that would otherwise override it. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;

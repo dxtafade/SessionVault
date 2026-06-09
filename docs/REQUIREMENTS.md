@@ -45,7 +45,7 @@ Status: ✅ done · 🛠 in progress · 📋 planned · 🔲 not started
 | Timed autosave (gated) | Dexter | ✅ | Armed only when `pro` |
 | Unlimited / long history | Storage (archive) + Core (lift cap) | 🛠 | **Storage archive DONE** — see below |
 | **Tab deduplication** | **Dexter** | 🛠 | Uses storage primitives — see below |
-| **Encrypted cloud sync + multi-device** | **Dexter (transport) + Storage (crypto)** | 🔲 | **Crypto unclaimed — Storage's next** |
+| **Encrypted cloud sync + multi-device** | **Dexter (transport) + Storage (crypto)** | 🛠 | **Crypto DONE** (`storage/crypto.js`); transport stubbed, Dexter swaps in sync.js |
 | Smart folders (auto-rules), project spaces | Storage (rules) + Lucik (UI) | 📋 | Builds on basic folders |
 | Billing / real licence | Dexter | 📋 | `entitlements.js` is a stub flag |
 
@@ -69,25 +69,22 @@ Dexter is building the user-facing dedup on top of these.
 duplicate Dexter's in-flight work. If Dexter wants a storage-level merge helper,
 he requests the exact signature and Storage adds it.
 
-### Encrypted cloud sync → Storage builds the crypto module
-`sync.js` has `encrypt`/`decrypt` stubbed (identity functions) with a
-`TODO(core)`. The crypto over the session blob is a data/storage concern and is
-**unclaimed**. Proposed: a new `storage/crypto.js`:
-- AES-GCM encryption of the serialized blob
-- key derived from the user's passphrase via PBKDF2 (SubtleCrypto)
-- `encryptBlob(obj, passphrase)` / `decryptBlob(cipher, passphrase)` returning
-  chrome.storage / transport-safe strings
-`sync.js` imports it to replace the stubs; transport/merge stay Dexter's.
-**Needs a 2-line agreement with Dexter on the function signatures first.**
+### Encrypted cloud sync → Storage built the crypto module ✅
+Signatures locked in [`CRYPTO_CONTRACT.md`](CRYPTO_CONTRACT.md); `storage/crypto.js`
+ships them: `encryptBlob(obj, passphrase)` / `decryptBlob(cipher, passphrase)`
+(AES-GCM + PBKDF2, `v1.`-versioned envelope, `DECRYPT_FAILED` errors). 8 tests
+cover the round-trip, non-determinism, and tamper/wrong-passphrase paths.
+**Remaining (Dexter):** in `sync.js`, delete the identity stubs and
+`import { encryptBlob, decryptBlob } from '../storage/crypto.js';`, then build the
+transport (`pushRemote`/`pullRemote`).
 
 ## Do we still need encrypted sync & dedup merge?
 
 - **Dedup merge:** ❌ No — Dexter is actively building dedup on the existing
   storage primitives. Storage adds nothing unless Dexter asks.
 - **Basic folders:** ❌ No more Storage work — model is done; only wiring + UI remain.
-- **Encrypted sync (crypto):** ✅ Yes — flagship Pro feature, unclaimed, and a
-  clean self-contained Storage module. This is the recommended next Storage task,
-  pending a quick signature agreement with Dexter.
+- **Encrypted sync (crypto):** ✅ Done — `storage/crypto.js` shipped to the locked
+  contract. Dexter swaps the stubs in `sync.js` and builds transport next.
 
 ## Coordination
 

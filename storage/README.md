@@ -6,7 +6,8 @@ call these functions — they never touch `chrome.storage` directly.
 - [`storage.js`](storage.js) — sessions, settings, search, dedup, trash, lock, folders, tags, archive, export/import, stats
 - [`file-transfer.js`](file-transfer.js) — JSON/gzip file download/upload (popup context)
 - [`gzip.js`](gzip.js) — gzip + base64 helpers (shared by archive + file-transfer)
-- Tests: `*.test.js` in this folder — run `npm test` (65 tests)
+- [`crypto.js`](crypto.js) — client-side encryption for sync (see [`docs/CRYPTO_CONTRACT.md`](../docs/CRYPTO_CONTRACT.md))
+- Tests: `*.test.js` in this folder — run `npm test` (77 tests)
 
 > **Storage owns these files only.** Wiring any of this into the message API
 > (`background/service-worker.js`) is the Core Engine's job.
@@ -154,6 +155,19 @@ Environment-agnostic (SW / popup / Node).
 | `gunzipToString(bytes)` | `Promise<string>` | Decompress |
 | `bytesToBase64(bytes)` / `base64ToBytes(b64)` | — | chunk-safe base64 |
 | `compressToBase64(text)` / `decompressFromBase64(b64)` | `Promise<string>` | chrome.storage-safe compressed string |
+
+## `crypto.js` API
+
+Client-side encryption for encrypted cloud sync (Pro). Implements the locked
+contract in [`docs/CRYPTO_CONTRACT.md`](../docs/CRYPTO_CONTRACT.md). AES-GCM over
+JSON, key from PBKDF2(passphrase). The passphrase is per-call and never persisted.
+
+| Function | Returns | Notes |
+|---|---|---|
+| `encryptBlob(obj, passphrase)` | `Promise<string>` | Opaque `v1.`-prefixed base64; random salt/iv per call; throws on empty passphrase |
+| `decryptBlob(cipher, passphrase)` | `Promise<object>` | Inverse; throws `DECRYPT_FAILED…` on wrong passphrase / tampered data |
+
+Core's `sync.js` imports these two and nothing else.
 
 ## `file-transfer.js` API
 

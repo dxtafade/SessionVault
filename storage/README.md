@@ -9,7 +9,8 @@ call these functions — they never touch `chrome.storage` directly.
 - [`spaces.js`](spaces.js) — project spaces: top-level grouping over folders/sessions (Pro)
 - [`gzip.js`](gzip.js) — gzip + base64 helpers (shared by archive + file-transfer)
 - [`crypto.js`](crypto.js) — client-side encryption for sync (see [`docs/CRYPTO_CONTRACT.md`](../docs/CRYPTO_CONTRACT.md))
-- Tests: `*.test.js` in this folder — run `npm test` (102 tests)
+- [`sync-support.js`](sync-support.js) — pure last-write-wins merge for multi-device sync (Core composes it)
+- Tests: `*.test.js` in this folder — run `npm test` (114 tests)
 
 > **Storage owns these files only.** Wiring any of this into the message API
 > (`background/service-worker.js`) is the Core Engine's job.
@@ -179,8 +180,22 @@ JSON, key from PBKDF2(passphrase). The passphrase is per-call and never persiste
 |---|---|---|
 | `encryptBlob(obj, passphrase)` | `Promise<string>` | Opaque `v1.`-prefixed base64; random salt/iv per call; throws on empty passphrase |
 | `decryptBlob(cipher, passphrase)` | `Promise<object>` | Inverse; throws `DECRYPT_FAILED…` on wrong passphrase / tampered data |
+| `assessPassphrase(passphrase)` | `{ score, label, acceptable, warnings }` | Advisory strength meter for the sync UI; doesn't block |
 
-Core's `sync.js` imports these two and nothing else.
+Core's `sync.js` imports `encryptBlob`/`decryptBlob`. `assessPassphrase` is for the UI's passphrase field.
+
+## `sync-support.js` API
+
+Pure merge logic for multi-device sync — no chrome.storage, no crypto, no
+transport. Core's `sync.js` composes these around its push/pull. Merge policy is
+last-write-wins by `updatedAt` (matching the existing session merge), now
+generalized so the whole vault (folders, smart folders, spaces) stays in sync.
+
+| Function | Returns | Notes |
+|---|---|---|
+| `mergeByUpdatedAt(local, remote)` | `{ [id]: record }` | LWW by `updatedAt`; union of ids; pure |
+| `mergeVault(localVault, remoteVault)` | `{ sessions, folders, smartFolders, spaces }` | Merges every vault collection |
+| `VAULT_COLLECTIONS` | `string[]` | The collection keys a vault carries |
 
 ## `file-transfer.js` API
 

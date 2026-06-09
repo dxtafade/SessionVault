@@ -68,6 +68,34 @@ export async function encryptBlob(obj, passphrase) {
 }
 
 /**
+ * Advisory passphrase-strength check for the encrypted-sync UI. The whole E2E
+ * guarantee rests on the passphrase, so a weak one quietly undermines it. This
+ * does NOT block encryption (that's the user's call) — it returns guidance the
+ * UI can surface as a strength meter.
+ *
+ * Returns { score: 0..4, label, acceptable: boolean, warnings: string[] }.
+ */
+export function assessPassphrase(passphrase) {
+  const pass = String(passphrase ?? '');
+  const length = pass.length;
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/]
+    .filter(re => re.test(pass)).length;
+
+  let score = 0;
+  if (length >= 8) score++;
+  if (length >= 12) score++;
+  if (classes >= 2) score++;
+  if (classes >= 3 && length >= 10) score++;
+
+  const warnings = [];
+  if (length < 8) warnings.push('Use at least 8 characters');
+  if (classes < 2) warnings.push('Mix letters, numbers, and symbols');
+
+  const labels = ['very weak', 'weak', 'fair', 'good', 'strong'];
+  return { score, label: labels[score], acceptable: score >= 2, warnings };
+}
+
+/**
  * Reverses encryptBlob, returning the original object.
  * Throws on a wrong passphrase or tampered/corrupt data; the error message
  * starts with `DECRYPT_FAILED` so Core can surface a clean message.

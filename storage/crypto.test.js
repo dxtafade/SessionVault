@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encryptBlob, decryptBlob } from './crypto.js';
+import { encryptBlob, decryptBlob, assessPassphrase } from './crypto.js';
 
 const PASS = 'correct horse battery staple';
 
@@ -60,5 +60,27 @@ describe('encryptBlob / decryptBlob — contract (docs/CRYPTO_CONTRACT.md)', () 
     }
     const obj = { sessions, settings: { autosaveInterval: 10 } };
     expect(await decryptBlob(await encryptBlob(obj, PASS), PASS)).toEqual(obj);
+  });
+});
+
+describe('assessPassphrase', () => {
+  it('flags a short/weak passphrase as not acceptable', () => {
+    const r = assessPassphrase('abc');
+    expect(r.acceptable).toBe(false);
+    expect(r.score).toBeLessThan(2);
+    expect(r.warnings).toContain('Use at least 8 characters');
+  });
+
+  it('rates a long mixed passphrase as strong', () => {
+    const r = assessPassphrase('Tr0ub4dour&3xtra');
+    expect(r.score).toBe(4);
+    expect(r.label).toBe('strong');
+    expect(r.acceptable).toBe(true);
+    expect(r.warnings).toEqual([]);
+  });
+
+  it('treats empty/nullish as very weak without throwing', () => {
+    expect(assessPassphrase('').label).toBe('very weak');
+    expect(assessPassphrase(undefined).acceptable).toBe(false);
   });
 });

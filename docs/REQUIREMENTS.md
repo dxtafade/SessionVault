@@ -45,7 +45,7 @@ Status: ✅ done · 🛠 in progress · 📋 planned · 🔲 not started
 | Timed autosave (gated) | Dexter | ✅ | Armed only when `pro` |
 | Unlimited / long history | Storage (archive) + Core (wire) | 🛠 | Storage + **Core wiring DONE** (`ARCHIVE_SESSION` Pro-gated; restore ungated; auto-archive on startup) |
 | **Tab deduplication** | **Dexter** | ✅ | Wired & Pro-gated |
-| **Encrypted cloud sync + multi-device** | **Dexter (transport) + Storage (crypto)** | 🛠 | Crypto DONE + **swapped into sync.js**; transport still stubbed |
+| **Encrypted cloud sync + multi-device** | **Dexter (transport) + Storage (crypto/merge)** | 🛠 | Crypto swapped into sync.js ✅; **vault merge ready** (`storage/sync-support.js`); transport backend = Dexter |
 | Smart folders (auto-rules) | Storage (rules) + Core (wire) + Lucik (UI) | 🛠 | Rules engine + **Core wiring DONE**; UI pending |
 | Project spaces | Storage + Core (wire) + Lucik (UI) | 🛠 | Storage model + **Core wiring DONE**; UI pending |
 | Full-vault backup (sessions + folders + smart folders) | Storage | ✅ | `exportData`/`importData` cover organization |

@@ -33,8 +33,8 @@ Status: ✅ done · 🛠 in progress · 📋 planned · 🔲 not started
 | Export / import (JSON, schema-validated) | Storage | ✅ | + gzip `.json.gz`, text |
 | Trash / soft-delete (30-day TTL) | Storage | ✅ | Core wired |
 | Lock session | Storage | ✅ | Core wired |
-| **Basic folders** (manual organize) | **Storage (model) + Core (wire) + Lucik (UI)** | 🛠 | **Storage model DONE** — see below |
-| Tags | Storage | ✅ | Powers folder-like filtering |
+| **Basic folders** (manual organize) | **Storage (model) + Core (wire) + Lucik (UI)** | 🛠 | Storage model + **Core wiring DONE**; UI pending |
+| Tags | Storage + Core (wire) | 🛠 | Storage + **Core wiring DONE**; UI pending |
 | 50-session free cap | Dexter (`entitlements.js`) | ✅ | |
 | Popup UI | Lucik | ✅ | adapter + mock mode, search, settings |
 
@@ -43,11 +43,11 @@ Status: ✅ done · 🛠 in progress · 📋 planned · 🔲 not started
 | Feature | Owner | Status | Notes |
 |---|---|---|---|
 | Timed autosave (gated) | Dexter | ✅ | Armed only when `pro` |
-| Unlimited / long history | Storage (archive) + Core (lift cap) | 🛠 | **Storage archive DONE** — see below |
-| **Tab deduplication** | **Dexter** | 🛠 | Uses storage primitives — see below |
-| **Encrypted cloud sync + multi-device** | **Dexter (transport) + Storage (crypto)** | 🛠 | **Crypto DONE** (`storage/crypto.js`); transport stubbed, Dexter swaps in sync.js |
-| Smart folders (auto-rules) | Storage (rules) + Core (wire) + Lucik (UI) | 🛠 | **Rules engine DONE** (`storage/smart-folders.js`) |
-| Project spaces | Storage + Core (wire) + Lucik (UI) | 🛠 | **Storage model DONE** (`storage/spaces.js`): Space > Folder > Session |
+| Unlimited / long history | Storage (archive) + Core (wire) | 🛠 | Storage + **Core wiring DONE** (`ARCHIVE_SESSION` Pro-gated; restore ungated; auto-archive on startup) |
+| **Tab deduplication** | **Dexter** | ✅ | Wired & Pro-gated |
+| **Encrypted cloud sync + multi-device** | **Dexter (transport) + Storage (crypto)** | 🛠 | Crypto DONE + **swapped into sync.js**; transport still stubbed |
+| Smart folders (auto-rules) | Storage (rules) + Core (wire) + Lucik (UI) | 🛠 | Rules engine + **Core wiring DONE**; UI pending |
+| Project spaces | Storage + Core (wire) + Lucik (UI) | 🛠 | Storage model + **Core wiring DONE**; UI pending |
 | Full-vault backup (sessions + folders + smart folders) | Storage | ✅ | `exportData`/`importData` cover organization |
 | Billing / real licence | Dexter | 📋 | `entitlements.js` is a stub flag |
 

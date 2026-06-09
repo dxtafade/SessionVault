@@ -44,6 +44,38 @@
  *   { action: 'DEDUPLICATE_SESSION', payload: { id } }              → { session, removed }
  *   { action: 'FIND_DUPLICATE_SESSIONS' }                            → { groups }   (string[][] of session ids)
  *
+ *   Tags (free):
+ *   { action: 'ADD_TAG',           payload: { id, tag } }           → { session }
+ *   { action: 'REMOVE_TAG',        payload: { id, tag } }           → { session }
+ *   { action: 'GET_ALL_TAGS' }                                       → { tags }     (string[], sorted)
+ *   { action: 'GET_SESSIONS_BY_TAG', payload: { tag } }             → { sessions }
+ *
+ *   Smart folders (Pro — rule-driven; reads ungated, mutations gated):
+ *   { action: 'GET_SMART_FOLDERS' }                                  → { smartFolders }
+ *   { action: 'CREATE_SMART_FOLDER', payload: { name, rules, color? } } → { smartFolder }
+ *   { action: 'UPDATE_SMART_FOLDER', payload: { id, ...partial } }  → { smartFolder }
+ *   { action: 'DELETE_SMART_FOLDER', payload: { id } }              → { ok }
+ *   { action: 'EVALUATE_SMART_FOLDER', payload: { id } }            → { sessions }
+ *   { action: 'PREVIEW_RULES',     payload: { rules } }             → { sessions }  (live preview before save)
+ *   { action: 'GET_SMART_FOLDER_COUNTS' }                            → { counts }    (rules schema: see storage/smart-folders.js)
+ *
+ *   Spaces (Pro — Space > Folder > Session; reads ungated, mutations gated):
+ *   { action: 'GET_SPACES' }                                         → { spaces }
+ *   { action: 'CREATE_SPACE',      payload: { name, color?, icon? } } → { space }
+ *   { action: 'UPDATE_SPACE',      payload: { id, ...partial } }    → { space }
+ *   { action: 'DELETE_SPACE',      payload: { id, reassignTo? } }   → { ok }
+ *   { action: 'ASSIGN_SESSION_TO_SPACE', payload: { id, spaceId } } → { session }
+ *   { action: 'ASSIGN_FOLDER_TO_SPACE',  payload: { folderId, spaceId } } → { folder }
+ *   { action: 'GET_SESSIONS_IN_SPACE', payload: { spaceId } }       → { sessions }
+ *   { action: 'GET_FOLDERS_IN_SPACE',  payload: { spaceId } }       → { folders }
+ *   { action: 'GET_SPACE_COUNTS' }                                   → { counts }
+ *
+ *   Archive / long history (Pro to archive; list/restore/delete ungated):
+ *   { action: 'ARCHIVE_SESSION',   payload: { id } }                → { entry }
+ *   { action: 'LIST_ARCHIVED' }                                      → { archived }  (metadata only)
+ *   { action: 'RESTORE_ARCHIVED',  payload: { id } }                → { session }   (cap-exempt)
+ *   { action: 'DELETE_ARCHIVED',   payload: { id } }                → { ok }
+ *
  *   Entitlements (free vs Pro):
  *   { action: 'GET_ENTITLEMENTS' }                                   → { entitlements: { pro }, limits: { freeSessionLimit } }
  *   { action: 'SET_PRO',          payload: { pro } }                → { entitlements }   (dev/stub toggle)
@@ -60,10 +92,10 @@
  *   - Timed autosave runs only for Pro; on free the alarm is never armed.
  *   - Free is capped at 50 manually-saved sessions; SAVE_SESSION / DUPLICATE_SESSION
  *     throw 'FREE_LIMIT_REACHED: …' at the cap (UI matches the prefix → upgrade prompt).
- *   - Folders are FREE (basic manual organization). Deduplication is Pro:
- *     DEDUPLICATE_SESSION / FIND_DUPLICATE_SESSIONS throw 'PRO_REQUIRED: …' on free.
- *   - Crash recovery (RECOVER_LAST), import, and trash are exempt — the safety
- *     net always works regardless of plan.
+ *   - Free: basic folders, tags. Pro (throw 'PRO_REQUIRED: …' on free):
+ *     deduplication, smart folders, spaces, and archiving a session.
+ *   - Crash recovery (RECOVER_LAST), import, and restoring from trash/archive
+ *     are exempt — retrieving your own data always works, regardless of plan.
  */
 
 import {
@@ -95,7 +127,38 @@ import {
   deleteFolder,
   assignSessionToFolder,
   getSessionsInFolder,
+  addTag,
+  removeTag,
+  getAllTags,
+  getSessionsByTag,
+  archiveSession,
+  restoreArchived,
+  deleteArchived,
+  listArchived,
+  autoArchiveOldSessions,
 } from '../storage/storage.js';
+
+import {
+  getSmartFolders,
+  createSmartFolder,
+  updateSmartFolder,
+  deleteSmartFolder,
+  evaluateSmartFolder,
+  previewRules,
+  getSmartFolderCounts,
+} from '../storage/smart-folders.js';
+
+import {
+  getSpaces,
+  createSpace,
+  updateSpace,
+  deleteSpace,
+  assignSessionToSpace,
+  assignFolderToSpace,
+  getSessionsInSpace,
+  getFoldersInSpace,
+  getSpaceCounts,
+} from '../storage/spaces.js';
 
 import * as sync from './sync.js';
 import { isPro, getEntitlements, setPro, FREE_SESSION_LIMIT } from './entitlements.js';
@@ -532,6 +595,156 @@ async function handleMessage({ action, payload = {} }) {
       return { groups };
     }
 
+    // ── Tags (free) ──
+
+    case 'ADD_TAG': {
+      const session = await addTag(payload.id, payload.tag);
+      return { session };
+    }
+
+    case 'REMOVE_TAG': {
+      const session = await removeTag(payload.id, payload.tag);
+      return { session };
+    }
+
+    case 'GET_ALL_TAGS': {
+      const tags = await getAllTags();
+      return { tags };
+    }
+
+    case 'GET_SESSIONS_BY_TAG': {
+      const sessions = await getSessionsByTag(payload.tag);
+      return { sessions };
+    }
+
+    // ── Smart folders (Pro — rule-driven, dynamic membership) ──
+
+    case 'GET_SMART_FOLDERS': {
+      const smartFolders = await getSmartFolders();
+      return { smartFolders };
+    }
+
+    case 'CREATE_SMART_FOLDER': {
+      await assertPro('Smart folders');
+      const smartFolder = await createSmartFolder(payload.name, payload.rules, {
+        color: payload.color ?? null,
+      });
+      return { smartFolder };
+    }
+
+    case 'UPDATE_SMART_FOLDER': {
+      await assertPro('Smart folders');
+      const { id, ...partial } = payload;
+      const smartFolder = await updateSmartFolder(id, partial);
+      return { smartFolder };
+    }
+
+    case 'DELETE_SMART_FOLDER': {
+      await assertPro('Smart folders');
+      await deleteSmartFolder(payload.id);
+      return { ok: true };
+    }
+
+    case 'EVALUATE_SMART_FOLDER': {
+      await assertPro('Smart folders');
+      const sessions = await evaluateSmartFolder(payload.id);
+      return { sessions };
+    }
+
+    case 'PREVIEW_RULES': {
+      await assertPro('Smart folders');
+      const sessions = await previewRules(payload.rules);
+      return { sessions };
+    }
+
+    case 'GET_SMART_FOLDER_COUNTS': {
+      const counts = await getSmartFolderCounts();
+      return { counts };
+    }
+
+    // ── Spaces (Pro — Space > Folder > Session) ──
+
+    case 'GET_SPACES': {
+      const spaces = await getSpaces();
+      return { spaces };
+    }
+
+    case 'CREATE_SPACE': {
+      await assertPro('Spaces');
+      const space = await createSpace(payload.name, {
+        color: payload.color ?? null,
+        icon: payload.icon ?? null,
+      });
+      return { space };
+    }
+
+    case 'UPDATE_SPACE': {
+      await assertPro('Spaces');
+      const { id, ...partial } = payload;
+      const space = await updateSpace(id, partial);
+      return { space };
+    }
+
+    case 'DELETE_SPACE': {
+      await assertPro('Spaces');
+      await deleteSpace(payload.id, { reassignTo: payload.reassignTo ?? null });
+      return { ok: true };
+    }
+
+    case 'ASSIGN_SESSION_TO_SPACE': {
+      await assertPro('Spaces');
+      const session = await assignSessionToSpace(payload.id, payload.spaceId ?? null);
+      return { session };
+    }
+
+    case 'ASSIGN_FOLDER_TO_SPACE': {
+      await assertPro('Spaces');
+      const folder = await assignFolderToSpace(payload.folderId, payload.spaceId ?? null);
+      return { folder };
+    }
+
+    case 'GET_SESSIONS_IN_SPACE': {
+      const sessions = await getSessionsInSpace(payload.spaceId ?? null);
+      return { sessions };
+    }
+
+    case 'GET_FOLDERS_IN_SPACE': {
+      const folders = await getFoldersInSpace(payload.spaceId ?? null);
+      return { folders };
+    }
+
+    case 'GET_SPACE_COUNTS': {
+      const counts = await getSpaceCounts();
+      return { counts };
+    }
+
+    // ── Archive / long history (Pro to archive; retrieval always allowed) ──
+    // Archiving (moving a session out) is the Pro "long history" mechanism, so
+    // it's gated. Listing / restoring / deleting archived sessions are NOT
+    // gated — a downgraded user must never lose access to their own data.
+
+    case 'ARCHIVE_SESSION': {
+      await assertPro('Archive');
+      const entry = await archiveSession(payload.id);
+      return { entry };
+    }
+
+    case 'LIST_ARCHIVED': {
+      const archived = await listArchived();
+      return { archived };
+    }
+
+    case 'RESTORE_ARCHIVED': {
+      // Recovery flow — exempt from the 50-session free cap (never lose tabs).
+      const session = await restoreArchived(payload.id);
+      return { session };
+    }
+
+    case 'DELETE_ARCHIVED': {
+      await deleteArchived(payload.id);
+      return { ok: true };
+    }
+
     // ── Entitlements (free vs Pro) ──
 
     case 'GET_ENTITLEMENTS': {
@@ -582,6 +795,11 @@ async function bootstrap() {
   await scheduleAutosave();
   await updateEmergencySnapshot();
   await purgeExpiredTrash();      // storage delegates trash GC to the engine
+  // Long-history maintenance: bound the hot set for Pro users by archiving
+  // old sessions. Free is capped at 50, so it never accumulates a backlog.
+  if (await isPro()) {
+    await autoArchiveOldSessions();
+  }
 }
 
 chrome.runtime.onInstalled.addListener(bootstrap);

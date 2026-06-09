@@ -122,6 +122,40 @@ const { session, removed } = await chrome.runtime.sendMessage({ action: 'DEDUPLI
 // Find groups of sessions with identical tab sets:
 const { groups } = await chrome.runtime.sendMessage({ action: 'FIND_DUPLICATE_SESSIONS' }); // groups: string[][] of session ids
 
+// ── Tags (free) ──
+await chrome.runtime.sendMessage({ action: 'ADD_TAG',    payload: { id, tag: 'work' } });   // → { session }
+await chrome.runtime.sendMessage({ action: 'REMOVE_TAG', payload: { id, tag: 'work' } });   // → { session }
+const { tags }     = await chrome.runtime.sendMessage({ action: 'GET_ALL_TAGS' });           // string[], sorted
+const { sessions } = await chrome.runtime.sendMessage({ action: 'GET_SESSIONS_BY_TAG', payload: { tag: 'work' } });
+
+// ── Smart folders (Pro) — dynamic, rule-driven membership ──
+// rules schema: { match: 'all'|'any', conditions: [{ field, op, value }] }  (see storage/smart-folders.js)
+const { smartFolders } = await chrome.runtime.sendMessage({ action: 'GET_SMART_FOLDERS' });
+const { smartFolder } = await chrome.runtime.sendMessage({ action: 'CREATE_SMART_FOLDER',
+  payload: { name: 'GitHub', rules: { match: 'any', conditions: [{ field: 'url', op: 'contains', value: 'github.com' }] } } });
+await chrome.runtime.sendMessage({ action: 'UPDATE_SMART_FOLDER', payload: { id, name: 'GH' } }); // → { smartFolder }
+await chrome.runtime.sendMessage({ action: 'DELETE_SMART_FOLDER', payload: { id } });             // → { ok }
+const { sessions: members } = await chrome.runtime.sendMessage({ action: 'EVALUATE_SMART_FOLDER', payload: { id } });
+const { sessions: preview } = await chrome.runtime.sendMessage({ action: 'PREVIEW_RULES', payload: { rules } }); // live preview
+const { counts } = await chrome.runtime.sendMessage({ action: 'GET_SMART_FOLDER_COUNTS' });       // { [id]: number }
+
+// ── Spaces (Pro) — top-level workspaces: Space > Folder > Session ──
+const { spaces } = await chrome.runtime.sendMessage({ action: 'GET_SPACES' });
+const { space }  = await chrome.runtime.sendMessage({ action: 'CREATE_SPACE', payload: { name: 'Client X', color: '#16a34a', icon: '📁' } });
+await chrome.runtime.sendMessage({ action: 'UPDATE_SPACE', payload: { id, name: 'Client Y' } });   // → { space }
+await chrome.runtime.sendMessage({ action: 'DELETE_SPACE', payload: { id } });                      // → { ok } (contents unassigned, not deleted)
+await chrome.runtime.sendMessage({ action: 'ASSIGN_SESSION_TO_SPACE', payload: { id, spaceId } });  // → { session }
+await chrome.runtime.sendMessage({ action: 'ASSIGN_FOLDER_TO_SPACE',  payload: { folderId, spaceId } }); // → { folder }
+const { sessions: spaceSessions } = await chrome.runtime.sendMessage({ action: 'GET_SESSIONS_IN_SPACE', payload: { spaceId } });
+const { folders: spaceFolders }   = await chrome.runtime.sendMessage({ action: 'GET_FOLDERS_IN_SPACE',  payload: { spaceId } });
+const { counts: spaceCounts }     = await chrome.runtime.sendMessage({ action: 'GET_SPACE_COUNTS' });  // { [id]: { folders, sessions } }
+
+// ── Archive / long history (Pro to archive; list/restore/delete always allowed) ──
+await chrome.runtime.sendMessage({ action: 'ARCHIVE_SESSION', payload: { id } });   // → { entry }  (Pro; moves session out of the active set)
+const { archived } = await chrome.runtime.sendMessage({ action: 'LIST_ARCHIVED' }); // metadata only: { id, name, createdAt, archivedAt, tabCount }[]
+await chrome.runtime.sendMessage({ action: 'RESTORE_ARCHIVED', payload: { id } });  // → { session }  (cap-exempt recovery)
+await chrome.runtime.sendMessage({ action: 'DELETE_ARCHIVED',  payload: { id } });  // → { ok }  (permanent)
+
 // ── Entitlements (free vs Pro) — see docs/TIERS.md ──
 // On open: show "N / 50" counter + Upgrade button; lock Autosave when !pro.
 const { entitlements, limits } =
@@ -157,12 +191,35 @@ Session {
   isAuto:      boolean       // true = created by autosave
   locked?:     boolean       // protected from delete / autosave pruning
   folderId?:   string | null // folder it's filed under (null = unfiled)
+  spaceId?:    string | null // project space (null = none)
+  tags?:       string[]      // lowercase tag strings
 }
 
 Folder {
   id:          string
   name:        string
   color:       string | null
+  spaceId?:    string | null // project space this folder belongs to
+  createdAt:   number
+  updatedAt:   number
+}
+
+SmartFolder {                // Pro — dynamic, rule-driven (no stored membership)
+  id:          string
+  name:        string
+  color:       string | null
+  rules:       RuleGroup     // { match: 'all'|'any', conditions: Condition[] }
+  createdAt:   number
+  updatedAt:   number
+}
+// Condition { field, op, value } — fields: name|url|title|tag|tabCount|createdAt|isAuto
+//   string ops: contains|equals|startsWith|endsWith · number ops: eq|gt|gte|lt|lte · bool: eq
+
+Space {                      // Pro — top-level workspace
+  id:          string
+  name:        string
+  color:       string | null
+  icon:        string | null
   createdAt:   number
   updatedAt:   number
 }

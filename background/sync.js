@@ -22,6 +22,8 @@
  * }
  */
 
+import { encryptBlob, decryptBlob } from '../storage/crypto.js';
+
 const SYNC_STATE_KEY = 'syncState';
 
 const DISABLED_STATUS = {
@@ -46,31 +48,10 @@ async function setStatus(partial) {
 }
 
 // ─── Encryption ────────────────────────────────────────────────────────────────
-//
-// AGREED CONTRACT with Storage (see docs/CRYPTO_CONTRACT.md). Storage ships
-// `storage/crypto.js` implementing exactly:
-//
-//   encryptBlob(obj: object, passphrase: string): Promise<string>
-//   decryptBlob(cipher: string, passphrase: string): Promise<object>
-//
-//   - AES-GCM over JSON.stringify(obj); key = PBKDF2(passphrase) via SubtleCrypto.
-//   - encryptBlob returns one transport/storage-safe string (salt + iv + ct, base64),
-//     self-contained so decrypt needs only the cipher + passphrase.
-//   - decryptBlob throws on a wrong passphrase or tampered data; the message
-//     starts with 'DECRYPT_FAILED' so sync can surface "wrong passphrase".
-//
-// SWAP-IN: when storage/crypto.js lands, delete the two stubs below and
-// uncomment this import — the call sites already match the signature.
-// import { encryptBlob, decryptBlob } from '../storage/crypto.js';
-
-// --- temporary identity stubs (signature-compatible) ---------------------------
-async function encryptBlob(obj, _passphrase) {
-  return JSON.stringify(obj);
-}
-async function decryptBlob(cipher, _passphrase) {
-  return JSON.parse(cipher);
-}
-// -------------------------------------------------------------------------------
+// Provided by storage/crypto.js per docs/CRYPTO_CONTRACT.md:
+//   encryptBlob(obj, passphrase) → transport-safe string (AES-GCM, PBKDF2 key)
+//   decryptBlob(cipher, passphrase) → object; throws 'DECRYPT_FAILED…' on bad key.
+// Imported at the top of this file.
 
 // ─── Remote transport (STUB) ───────────────────────────────────────────────────
 // TODO(core): implement against the sync backend once chosen.

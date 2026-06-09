@@ -1,5 +1,16 @@
 /* UI styles — owned by the UI developer. */
 
+:root {
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --bg: #ffffff;
+  --bg-soft: #f7f7f7;
+  --bg-soft-hover: #f0f0f0;
+  --border: #e5e5e5;
+  --text: #1a1a1a;
+  --text-muted: #888;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -10,9 +21,9 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;
   width: 360px;
-  min-height: 200px;
-  background: #fff;
-  color: #1a1a1a;
+  min-height: 220px;
+  background: var(--bg);
+  color: var(--text);
 }
 
 #app {
@@ -21,9 +32,14 @@ body {
   height: 100%;
 }
 
+/* ─── Header ──────────────────────────────────────────────────────────────── */
+
 header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid #e5e5e5;
+  border-bottom: 1px solid var(--border);
 }
 
 header h1 {
@@ -31,32 +47,97 @@ header h1 {
   font-weight: 600;
 }
 
+.header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* ─── Buttons ─────────────────────────────────────────────────────────────── */
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-primary:hover { background: var(--accent-hover); }
+
+.btn-secondary {
+  background: var(--bg-soft);
+  color: #555;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.btn-secondary:hover { background: var(--bg-soft-hover); }
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.icon-btn:hover { background: var(--bg-soft-hover); color: var(--text); }
+
+/* ─── Toolbar (search / settings header) ──────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar-title { font-weight: 600; }
+
+#search {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+#search:focus { border-color: var(--accent); }
+
+/* ─── Sessions list ───────────────────────────────────────────────────────── */
+
 #sessions-list {
   flex: 1;
   padding: 8px;
   overflow-y: auto;
-  max-height: 400px;
+  max-height: 380px;
 }
 
 .empty {
-  color: #888;
+  color: var(--text-muted);
   text-align: center;
-  padding: 24px;
+  padding: 28px 16px;
+  line-height: 1.5;
 }
 
 .session-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 8px 10px;
   border-radius: 6px;
   margin-bottom: 4px;
-  background: #f7f7f7;
+  background: var(--bg-soft);
 }
-
-.session-card:hover {
-  background: #f0f0f0;
-}
+.session-card:hover { background: var(--bg-soft-hover); }
 
 .session-info {
   display: flex;
@@ -72,60 +153,145 @@ header h1 {
   text-overflow: ellipsis;
 }
 
+.badge-auto {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #e0e7ff;
+  color: #3730a3;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
 .session-meta {
   font-size: 11px;
-  color: #888;
+  color: var(--text-muted);
 }
 
 .session-actions {
   display: flex;
+  align-items: center;
   gap: 4px;
   flex-shrink: 0;
 }
 
-.session-actions button {
-  padding: 4px 8px;
+.btn-restore {
+  background: var(--accent);
+  color: #fff;
   border: none;
   border-radius: 4px;
-  cursor: pointer;
+  padding: 4px 8px;
   font-size: 12px;
+  cursor: pointer;
 }
+.btn-restore:hover { background: var(--accent-hover); }
 
-.btn-restore {
-  background: #2563eb;
-  color: #fff;
-}
-
-.btn-restore:hover {
-  background: #1d4ed8;
-}
-
-.btn-delete {
-  background: #e5e5e5;
-  color: #555;
-}
-
-.btn-delete:hover {
-  background: #d4d4d4;
-}
+/* ─── Footer ──────────────────────────────────────────────────────────────── */
 
 footer {
   padding: 10px 16px;
-  border-top: 1px solid #e5e5e5;
+  border-top: 1px solid var(--border);
 }
+footer .btn-primary { width: 100%; }
 
-#btn-save {
-  width: 100%;
-  padding: 8px;
-  background: #2563eb;
-  color: #fff;
-  border: none;
+/* ─── Settings ────────────────────────────────────────────────────────────── */
+
+.settings { padding: 8px 16px; }
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.setting-row:last-of-type { border-bottom: none; }
+
+.setting-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.setting-label small { color: var(--text-muted); font-size: 11px; }
+
+.setting-row input[type='number'] {
+  width: 64px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  text-align: right;
+}
+.setting-row input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
   cursor: pointer;
 }
 
-#btn-save:hover {
-  background: #1d4ed8;
+.settings-status {
+  color: #16a34a;
+  font-size: 12px;
+  text-align: right;
+  padding-top: 8px;
+}
+
+/* ─── Modal ───────────────────────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 16px;
+  width: 300px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.modal-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+.modal-message { font-size: 13px; color: #444; margin-bottom: 12px; line-height: 1.4; }
+
+.modal-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 12px;
+  outline: none;
+}
+.modal-input:focus { border-color: var(--accent); }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ─── Mock badge (dev only) ───────────────────────────────────────────────── */
+
+.mock-badge {
+  position: fixed;
+  bottom: 6px;
+  right: 6px;
+  font-size: 10px;
+  background: #fde68a;
+  color: #92400e;
+  border-radius: 4px;
+  padding: 2px 6px;
+  pointer-events: none;
+  opacity: 0.9;
 }

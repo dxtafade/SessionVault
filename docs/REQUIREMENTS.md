@@ -47,7 +47,7 @@ Status: ✅ done · 🛠 in progress · 📋 planned · 🔲 not started
 | **Tab deduplication** | **Dexter** | 🛠 | Uses storage primitives — see below |
 | **Encrypted cloud sync + multi-device** | **Dexter (transport) + Storage (crypto)** | 🛠 | **Crypto DONE** (`storage/crypto.js`); transport stubbed, Dexter swaps in sync.js |
 | Smart folders (auto-rules) | Storage (rules) + Core (wire) + Lucik (UI) | 🛠 | **Rules engine DONE** (`storage/smart-folders.js`) |
-| Project spaces | Storage + Lucik | 📋 | Higher-level grouping over folders |
+| Project spaces | Storage + Core (wire) + Lucik (UI) | 🛠 | **Storage model DONE** (`storage/spaces.js`): Space > Folder > Session |
 | Full-vault backup (sessions + folders + smart folders) | Storage | ✅ | `exportData`/`importData` cover organization |
 | Billing / real licence | Dexter | 📋 | `entitlements.js` is a stub flag |
 

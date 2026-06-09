@@ -6,9 +6,10 @@ call these functions — they never touch `chrome.storage` directly.
 - [`storage.js`](storage.js) — sessions, settings, search, dedup, trash, lock, folders, tags, archive, export/import, stats
 - [`file-transfer.js`](file-transfer.js) — JSON/gzip file download/upload (popup context)
 - [`smart-folders.js`](smart-folders.js) — rule-driven dynamic session grouping (Pro)
+- [`spaces.js`](spaces.js) — project spaces: top-level grouping over folders/sessions (Pro)
 - [`gzip.js`](gzip.js) — gzip + base64 helpers (shared by archive + file-transfer)
 - [`crypto.js`](crypto.js) — client-side encryption for sync (see [`docs/CRYPTO_CONTRACT.md`](../docs/CRYPTO_CONTRACT.md))
-- Tests: `*.test.js` in this folder — run `npm test` (94 tests)
+- Tests: `*.test.js` in this folder — run `npm test` (102 tests)
 
 > **Storage owns these files only.** Wiring any of this into the message API
 > (`background/service-worker.js`) is the Core Engine's job.
@@ -24,7 +25,8 @@ Session {
   tabs: Tab[]
   isAuto: boolean        // true = created by autosave
   locked?: boolean       // protected from trashing
-  folderId?: string|null // smart folders / project spaces
+  folderId?: string|null // basic folder assignment
+  spaceId?: string|null  // project space assignment
   tags?: string[]        // free-form labels (normalized lowercase)
 }
 
@@ -41,6 +43,16 @@ Folder {
   id: string
   name: string
   color?: string|null
+  createdAt: number
+  updatedAt: number
+  spaceId?: string|null  // which project space it belongs to
+}
+
+Space {                  // top-level grouping: Space > Folder > Session
+  id: string
+  name: string
+  color?: string|null
+  icon?: string|null
   createdAt: number
   updatedAt: number
 }
@@ -61,7 +73,7 @@ Settings {
 }
 ```
 
-Storage keys: `sessions`, `settings`, `trash`, `folders`, `archive`, `_schemaVersion` (current: **2**).
+Storage keys: `sessions`, `settings`, `trash`, `folders`, `smartFolders`, `spaces`, `archive`, `_schemaVersion` (current: **3**).
 
 ## `storage.js` API
 
@@ -231,6 +243,24 @@ Condition { field, op, value }
 | `previewRules(rules)` | `Session[]` | Evaluate ad-hoc rules without saving |
 | `getSmartFolderCounts()` | `{ [id]: number }` | Member counts for badges |
 
+## `spaces.js` API
+
+Project spaces (Pro) — top-level grouping: `Space > Folder > Session`. Sessions
+and folders carry a `spaceId`; assignment is a pointer, so deleting a space
+never deletes its contents. Stored under key `spaces`.
+
+| Function | Returns | Notes |
+|---|---|---|
+| `getSpaces()` / `getSpace(id)` | map / `Space\|null` | |
+| `createSpace(name, { color?, icon? })` | `Space` | |
+| `updateSpace(id, partial)` | `Space` | |
+| `deleteSpace(id, { reassignTo = null })` | `void` | Reassigns sessions + folders — never loses them |
+| `assignSessionToSpace(id, spaceId\|null)` | `Session` | `null` = unassigned |
+| `assignFolderToSpace(id, spaceId\|null)` | `Folder` | `null` = unassigned |
+| `getSessionsInSpace(spaceId\|null)` | `Session[]` | newest-first |
+| `getFoldersInSpace(spaceId\|null)` | `Folder[]` | |
+| `getSpaceCounts()` | `{ [id]: { folders, sessions } }` | Badge counts |
+
 ## Pending Core Engine wiring
 
 Trash, lock, search, export/import, stats, and migration are already wired by
@@ -245,5 +275,8 @@ when the UI needs them:
 - **Tags:** `addTag`, `removeTag`, `getAllTags`, `getSessionsByTag`
 - **Smart folders:** `createSmartFolder`, `updateSmartFolder`, `deleteSmartFolder`,
   `getSmartFolders`, `evaluateSmartFolder`, `previewRules`, `getSmartFolderCounts`
+- **Spaces:** `createSpace`, `updateSpace`, `deleteSpace`, `getSpaces`,
+  `assignSessionToSpace`, `assignFolderToSpace`, `getSessionsInSpace`,
+  `getFoldersInSpace`, `getSpaceCounts`
 - **Archive:** `archiveSession`, `restoreArchived`, `deleteArchived`,
   `listArchived`, `autoArchiveOldSessions` (good candidate for a startup/alarm call)

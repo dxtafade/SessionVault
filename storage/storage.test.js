@@ -145,7 +145,7 @@ describe('export / import', () => {
     const blob = await store.exportData();
     expect(blob.sessions.a).toBeDefined();
     expect(blob.settings).toBeDefined();
-    expect(blob._schemaVersion).toBe(2);
+    expect(blob._schemaVersion).toBe(3);
     expect(typeof blob._exportedAt).toBe('number');
   });
 
@@ -336,6 +336,6 @@ describe('migrateIfNeeded', () => {
   it('stamps the schema version', async () => {
     await store.migrateIfNeeded();
     const { _schemaVersion } = await chrome.storage.local.get('_schemaVersion');
-    expect(_schemaVersion).toBe(2);
+    expect(_schemaVersion).toBe(3);
   });
 });

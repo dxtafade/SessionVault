@@ -15,7 +15,8 @@
  *   tabs: Tab[],
  *   isAuto: boolean,
  *   locked?: boolean,
- *   folderId?: string | null,   // smart folders / project spaces
+ *   folderId?: string | null,   // basic folder assignment
+ *   spaceId?: string | null,    // project space assignment
  *   tags?: string[]             // free-form labels
  * }
  *
@@ -23,7 +24,10 @@
  * { url, title, favIconUrl, pinned, index, windowIndex? }
  *
  * Folder shape (key `folders` = { [id]: Folder }):
- * { id, name, color?, createdAt, updatedAt }
+ * { id, name, color?, createdAt, updatedAt, spaceId?: string | null }
+ *
+ * Space shape (key `spaces` = { [id]: Space }) — top-level grouping over folders/sessions:
+ * { id, name, color?, icon?, createdAt, updatedAt }
  *
  * Archive entry (key `archive` = { [id]: ArchivedEntry }):
  * { id, name, createdAt, archivedAt, tabCount, data }  // data = base64(gzip(JSON(session)))
@@ -34,7 +38,7 @@
 
 import { compressToBase64, decompressFromBase64 } from './gzip.js';
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const DEFAULT_SETTINGS = {
   autosaveEnabled: true,
@@ -67,9 +71,10 @@ export async function migrateIfNeeded() {
   if (_schemaVersion === SCHEMA_VERSION) return;
 
   // v0 → v1: original skeleton, no transform needed.
-  // v1 → v2: smart folders, tags, and archive added. The new fields are all
-  //          optional and the new keys default to {} on read, so no data
-  //          transform is required — just stamp the version.
+  // v1 → v2: smart folders, tags, and archive added.
+  // v2 → v3: project spaces added (session.spaceId, folder.spaceId, `spaces` key).
+  //          All new fields are optional and new keys default to {} on read, so
+  //          no data transform is required — just stamp the version.
   await _write({ _schemaVersion: SCHEMA_VERSION });
 }
 
@@ -294,17 +299,19 @@ export async function exportSessionAsText(id) {
 
 /**
  * Serialises everything needed to fully restore a vault — sessions, settings,
- * and the user's organization (folders + smart folders) — into a plain object
- * ready to be JSON.stringify-ed or handed to the File API. Tags live on the
- * sessions, so they ride along automatically.
+ * and the user's organization (folders, smart folders, spaces) — into a plain
+ * object ready to be JSON.stringify-ed or handed to the File API. Tags live on
+ * the sessions, so they ride along automatically.
  */
 export async function exportData() {
-  const [sessions, settings, { folders = {} }, { smartFolders = {} }] = await Promise.all([
-    getAllSessions(),
-    getSettings(),
-    _read('folders'),
-    _read('smartFolders'),
-  ]);
+  const [sessions, settings, { folders = {} }, { smartFolders = {} }, { spaces = {} }] =
+    await Promise.all([
+      getAllSessions(),
+      getSettings(),
+      _read('folders'),
+      _read('smartFolders'),
+      _read('spaces'),
+    ]);
   return {
     _exportedAt: Date.now(),
     _schemaVersion: SCHEMA_VERSION,
@@ -312,6 +319,7 @@ export async function exportData() {
     settings,
     folders,
     smartFolders,
+    spaces,
   };
 }
 
@@ -321,9 +329,9 @@ export async function exportData() {
  *   'merge'   — keeps existing data, adds/overwrites from import (default)
  *   'replace' — clears sessions/folders/smartFolders first, then imports
  *
- * Folders and smart folders are restored too when present, so a backup never
- * loses the user's organization. Returns { imported: number, skipped: number }
- * (session counts).
+ * Folders, smart folders, and spaces are restored too when present, so a
+ * backup never loses the user's organization. Returns
+ * { imported: number, skipped: number } (session counts).
  */
 export async function importData(blob, mode = 'merge') {
   if (!blob || typeof blob !== 'object') throw new Error('Invalid import file');
@@ -358,6 +366,11 @@ export async function importData(blob, mode = 'merge') {
     await _write({ smartFolders: { ...base, ...blob.smartFolders } });
   }
 
+  if (blob.spaces && typeof blob.spaces === 'object') {
+    const base = mode === 'replace' ? {} : (await _read('spaces')).spaces ?? {};
+    await _write({ spaces: { ...base, ...blob.spaces } });
+  }
+
   return { imported, skipped };
 }
 
@@ -383,15 +396,17 @@ export async function getStorageUsage() {
  *   trashCount: number,
  *   archivedCount: number,
  *   folderCount: number,
+ *   spaceCount: number,
  *   usage: { used, quota, percent }
  * }
  */
 export async function getStorageStats() {
-  const [sessionsMap, trash, archive, folders, usage] = await Promise.all([
+  const [sessionsMap, trash, archive, folders, { spaces = {} }, usage] = await Promise.all([
     getAllSessions(),
     getTrash(),
     getArchive(),
     getFolders(),
+    _read('spaces'),
     getStorageUsage(),
   ]);
 
@@ -411,6 +426,7 @@ export async function getStorageStats() {
     trashCount: Object.keys(trash).length,
     archivedCount: Object.keys(archive).length,
     folderCount: Object.keys(folders).length,
+    spaceCount: Object.keys(spaces).length,
     usage,
   };
 }

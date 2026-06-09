@@ -13,6 +13,19 @@ function fakeFile(contents) {
   return { text: async () => contents };
 }
 
+/** A File-like object backed by raw bytes (supports .arrayBuffer()). */
+function fileFromBytes(bytes) {
+  return {
+    async arrayBuffer() {
+      return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    },
+  };
+}
+
+function fileFromText(text) {
+  return fileFromBytes(new TextEncoder().encode(text));
+}
+
 beforeEach(() => {
   installChromeMock();
 });
@@ -60,6 +73,52 @@ describe('importFromFile', () => {
     const blob = { sessions: { fresh: makeSession('fresh', 'Fresh') } };
     await ft.importFromFile(fakeFile(JSON.stringify(blob)), 'replace');
     expect(Object.keys(await store.getAllSessions())).toEqual(['fresh']);
+  });
+});
+
+// ─── Gzip compression ────────────────────────────────────────────────────────────
+
+describe('gzip helpers', () => {
+  it('round-trips a string through gzip/gunzip', async () => {
+    const text = JSON.stringify({ hello: 'world', n: [1, 2, 3] });
+    const bytes = await ft.gzipString(text);
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes[0]).toBe(0x1f); // gzip magic bytes
+    expect(bytes[1]).toBe(0x8b);
+    expect(await ft.gunzipToString(bytes)).toBe(text);
+  });
+
+  it('actually shrinks repetitive data', async () => {
+    const text = 'a'.repeat(5000);
+    const bytes = await ft.gzipString(text);
+    expect(bytes.length).toBeLessThan(text.length);
+  });
+});
+
+describe('readBackupFile (auto-detect)', () => {
+  it('reads a plain JSON backup', async () => {
+    const parsed = await ft.readBackupFile(fileFromText('{"sessions":{}}'));
+    expect(parsed).toEqual({ sessions: {} });
+  });
+
+  it('reads a gzipped backup', async () => {
+    const gz = await ft.gzipString('{"sessions":{}}');
+    const parsed = await ft.readBackupFile(fileFromBytes(gz));
+    expect(parsed).toEqual({ sessions: {} });
+  });
+
+  it('throws on invalid JSON', async () => {
+    await expect(ft.readBackupFile(fileFromText('nope'))).rejects.toThrow(/not valid JSON/);
+  });
+});
+
+describe('importBackupFile', () => {
+  it('imports from a gzipped backup', async () => {
+    const blob = { sessions: { a: makeSession('a', 'A') } };
+    const gz = await ft.gzipString(JSON.stringify(blob));
+    const res = await ft.importBackupFile(fileFromBytes(gz));
+    expect(res).toEqual({ imported: 1, skipped: 0 });
+    expect(await store.getSession('a')).not.toBeNull();
   });
 });
 

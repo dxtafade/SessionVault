@@ -40,14 +40,32 @@ export async function readJSONFile(file) {
   }
 }
 
+// ─── Gzip helpers (CompressionStream — works in MV3 + Node 18+) ──────────────────
+
+/** Gzip-compresses a string, returns the bytes. */
+export async function gzipString(text) {
+  const cs = new CompressionStream('gzip');
+  const writer = cs.writable.getWriter();
+  writer.write(new TextEncoder().encode(text));
+  writer.close();
+  const buf = await new Response(cs.readable).arrayBuffer();
+  return new Uint8Array(buf);
+}
+
+/** Decompresses gzip bytes back into a string. */
+export async function gunzipToString(bytes) {
+  const ds = new DecompressionStream('gzip');
+  const writer = ds.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const buf = await new Response(ds.readable).arrayBuffer();
+  return new TextDecoder().decode(buf);
+}
+
 // ─── DOM-backed helpers (popup context only) ─────────────────────────────────────
 
-/**
- * Triggers a browser download of `data` as a JSON file.
- * Must run where `document` exists (the popup), not the service worker.
- */
-export function downloadJSON(data, filename = backupFilename()) {
-  const blob = new Blob([toJSONString(data)], { type: 'application/json' });
+/** Triggers a browser download of a Blob. Popup context only. */
+function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -58,10 +76,30 @@ export function downloadJSON(data, filename = backupFilename()) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Triggers a browser download of `data` as a JSON file.
+ * Must run where `document` exists (the popup), not the service worker.
+ */
+export function downloadJSON(data, filename = backupFilename()) {
+  triggerDownload(new Blob([toJSONString(data)], { type: 'application/json' }), filename);
+}
+
 /** Exports everything and downloads it as a dated backup file. */
 export async function downloadBackup() {
   const data = await exportData();
   downloadJSON(data, backupFilename());
+}
+
+/**
+ * Exports everything and downloads it as a gzip-compressed backup
+ * (`.json.gz`). Far smaller for large session histories — keeps big
+ * backups well under the storage quota and faster to move around.
+ */
+export async function downloadBackupCompressed() {
+  const data = await exportData();
+  const bytes = await gzipString(toJSONString(data));
+  const filename = backupFilename().replace(/\.json$/, '.json.gz');
+  triggerDownload(new Blob([bytes], { type: 'application/gzip' }), filename);
 }
 
 /**
@@ -72,7 +110,7 @@ export function pickJSONFile() {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'application/json,.json';
+    input.accept = 'application/json,application/gzip,.json,.gz';
     input.addEventListener('change', () => {
       const file = input.files?.[0];
       if (file) resolve(file);
@@ -83,11 +121,37 @@ export function pickJSONFile() {
 }
 
 /**
+ * Reads a backup file and parses it, auto-detecting gzip vs plain JSON
+ * via the gzip magic bytes (0x1f 0x8b). Use this for imports so a user
+ * can drop in either a `.json` or a `.json.gz` backup.
+ */
+export async function readBackupFile(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const isGzip = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+  const text = isGzip ? await gunzipToString(bytes) : new TextDecoder().decode(bytes);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('File is not valid JSON');
+  }
+}
+
+/**
  * Reads a chosen JSON file and imports it into storage.
  * mode: 'merge' (default) | 'replace'.
  * Returns { imported, skipped }.
  */
 export async function importFromFile(file, mode = 'merge') {
   const blob = await readJSONFile(file);
+  return importData(blob, mode);
+}
+
+/**
+ * Reads a backup file (plain or gzipped) and imports it into storage.
+ * Auto-detects the format. mode: 'merge' (default) | 'replace'.
+ * Returns { imported, skipped }.
+ */
+export async function importBackupFile(file, mode = 'merge') {
+  const blob = await readBackupFile(file);
   return importData(blob, mode);
 }

@@ -102,11 +102,16 @@ Popup context only — these touch the DOM. The data helpers are safe anywhere.
 |---|---|---|
 | `backupFilename(date?)` | `string` | `session-vault-backup-YYYY-MM-DD.json` |
 | `toJSONString(data)` | `string` | Pretty JSON |
+| `gzipString(text)` | `Promise<Uint8Array>` | Gzip-compress (CompressionStream) |
+| `gunzipToString(bytes)` | `Promise<string>` | Decompress gzip bytes |
 | `downloadJSON(data, filename?)` | `void` | Triggers a file download |
-| `downloadBackup()` | `void` | `exportData()` + download |
-| `pickJSONFile()` | `Promise<File>` | Opens OS file picker |
-| `readJSONFile(file)` | `Promise<object>` | Parses; throws on bad JSON |
-| `importFromFile(file, mode?)` | `Promise<{ imported, skipped }>` | Read + import |
+| `downloadBackup()` | `void` | `exportData()` + download (`.json`) |
+| `downloadBackupCompressed()` | `void` | `exportData()` + gzip + download (`.json.gz`) |
+| `pickJSONFile()` | `Promise<File>` | Opens OS file picker (`.json` / `.gz`) |
+| `readJSONFile(file)` | `Promise<object>` | Parses plain JSON; throws on bad JSON |
+| `readBackupFile(file)` | `Promise<object>` | Auto-detects gzip vs JSON via magic bytes |
+| `importFromFile(file, mode?)` | `Promise<{ imported, skipped }>` | Read JSON + import |
+| `importBackupFile(file, mode?)` | `Promise<{ imported, skipped }>` | Read (plain **or** gz) + import |
 
 ### Example (UI → Storage, in the popup)
 

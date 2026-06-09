@@ -36,7 +36,8 @@ const { session } = await chrome.runtime.sendMessage({
 // Restore a session (opens all tabs, recreates original windows)
 await chrome.runtime.sendMessage({ action: 'RESTORE_SESSION', payload: { id } });
 
-// Delete a session
+// Delete a session — SOFT delete: moves it to the trash (undoable, purged
+// after 30 days). Pass { id, force: true } to delete a locked session.
 await chrome.runtime.sendMessage({ action: 'DELETE_SESSION', payload: { id } });
 
 // Rename a session
@@ -82,6 +83,24 @@ const { results } = await chrome.runtime.sendMessage({
   action: 'SEARCH_SESSIONS',
   payload: { query: 'github' }
 });
+
+// ── Trash (soft delete) — DELETE_SESSION lands sessions here ──
+const { trash } = await chrome.runtime.sendMessage({ action: 'GET_TRASH' });
+//   trash: { [id]: Session & { trashedAt } }
+await chrome.runtime.sendMessage({ action: 'RESTORE_FROM_TRASH', payload: { id } }); // → { session }
+await chrome.runtime.sendMessage({ action: 'DELETE_FROM_TRASH',  payload: { id } }); // → { ok }   (permanent)
+await chrome.runtime.sendMessage({ action: 'EMPTY_TRASH' });                          // → { ok }
+// PURGE_TRASH runs automatically on startup; rarely needed manually.
+
+// ── Lock (protect a session from delete / autosave pruning) ──
+await chrome.runtime.sendMessage({ action: 'LOCK_SESSION',   payload: { id } }); // → { session }
+await chrome.runtime.sendMessage({ action: 'UNLOCK_SESSION', payload: { id } }); // → { session }
+
+// ── Misc ──
+// Storage dashboard stats: { sessions: {total,auto,manual,locked}, totalTabs, trashCount, usage }
+const { stats } = await chrome.runtime.sendMessage({ action: 'GET_STORAGE_STATS' });
+// One session's tab urls as plain text (newline-joined)
+const { text } = await chrome.runtime.sendMessage({ action: 'EXPORT_SESSION_TEXT', payload: { id } });
 
 // ── Cloud sync (paid) — transport is stubbed for now, contract is stable ──
 

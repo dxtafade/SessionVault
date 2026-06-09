@@ -7,7 +7,7 @@
  * Message API (chrome.runtime.sendMessage / popup → engine):
  *   { action: 'SAVE_SESSION',      payload: { name } }              → { session }
  *   { action: 'RESTORE_SESSION',   payload: { id } }                → { ok }
- *   { action: 'DELETE_SESSION',    payload: { id } }                → { ok }
+ *   { action: 'DELETE_SESSION',    payload: { id, force? } }        → { ok }   (soft delete → trash)
  *   { action: 'RENAME_SESSION',    payload: { id, name } }          → { session }
  *   { action: 'DUPLICATE_SESSION', payload: { id, name? } }         → { session }
  *   { action: 'GET_SESSIONS' }                                       → { sessions }
@@ -16,8 +16,23 @@
  *   { action: 'UPDATE_SETTINGS',   payload: { ...partial } }        → { settings }
  *   { action: 'RECOVER_LAST',      payload: { name? } }             → { session | null }
  *   { action: 'EXPORT_SESSIONS' }                                    → { json }
- *   { action: 'IMPORT_SESSIONS',   payload: { json } }              → { imported, skipped }
+ *   { action: 'IMPORT_SESSIONS',   payload: { json, mode? } }       → { imported, skipped }
  *   { action: 'SEARCH_SESSIONS',   payload: { query } }             → { results }
+ *   { action: 'EXPORT_SESSION_TEXT', payload: { id } }              → { text }   (tab urls, newline-joined)
+ *   { action: 'GET_STORAGE_STATS' }                                  → { stats }
+ *
+ *   Trash (soft delete):
+ *   { action: 'GET_TRASH' }                                          → { trash }
+ *   { action: 'RESTORE_FROM_TRASH', payload: { id } }               → { session }
+ *   { action: 'DELETE_FROM_TRASH',  payload: { id } }               → { ok }
+ *   { action: 'EMPTY_TRASH' }                                        → { ok }
+ *   { action: 'PURGE_TRASH',       payload: { ttlDays? } }          → { purged }
+ *
+ *   Lock:
+ *   { action: 'LOCK_SESSION',      payload: { id } }                → { session }
+ *   { action: 'UNLOCK_SESSION',    payload: { id } }                → { session }
+ *
+ *   Cloud sync (paid, stubbed):
  *   { action: 'GET_SYNC_STATUS' }                                    → { status }
  *   { action: 'SET_SYNC_ENABLED', payload: { enabled, credentials? } } → { status }
  *   { action: 'SYNC_NOW' }                                           → { status }
@@ -33,6 +48,20 @@ import {
   deleteSession,
   getSettings,
   updateSettings,
+  migrateIfNeeded,
+  searchSessions as storageSearch,
+  trashSession,
+  getTrash,
+  restoreFromTrash,
+  deleteFromTrash,
+  emptyTrash,
+  purgeExpiredTrash,
+  lockSession,
+  unlockSession,
+  exportData,
+  importData,
+  exportSessionAsText,
+  getStorageStats,
 } from '../storage/storage.js';
 
 import * as sync from './sync.js';
@@ -131,7 +160,7 @@ async function pruneAutoSessions() {
   const settings = await getSettings();
   const sessions = await getAllSessions();
   const autoSessions = Object.values(sessions)
-    .filter(s => s.isAuto)
+    .filter(s => s.isAuto && !s.locked) // never prune a locked session
     .sort((a, b) => b.createdAt - a.createdAt);
 
   for (const s of autoSessions.slice(settings.maxAutoSessions)) {
@@ -140,30 +169,23 @@ async function pruneAutoSessions() {
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────
-// Free-tier basic search: matches the query against session name and each
-// tab's title/url. Returns sessions that matched plus the tabs that matched,
-// so the UI can highlight hits.
+// Base matching lives in storage.searchSessions (single source of truth).
+// The engine only enriches each hit with the tabs that matched, so the UI can
+// highlight them.
 
-function searchSessions(sessions, rawQuery) {
-  const query = rawQuery.trim().toLowerCase();
-  if (!query) return [];
-
-  const results = [];
-  for (const session of Object.values(sessions)) {
-    const nameMatch = session.name.toLowerCase().includes(query);
-    const matchedTabs = session.tabs.filter(
-      t =>
-        (t.title ?? '').toLowerCase().includes(query) ||
-        (t.url ?? '').toLowerCase().includes(query),
-    );
-
-    if (nameMatch || matchedTabs.length > 0) {
-      results.push({ session, matchedTabs, nameMatch });
-    }
-  }
-
-  // Most recently created first
-  return results.sort((a, b) => b.session.createdAt - a.session.createdAt);
+function enrichSearchHits(sessions, rawQuery) {
+  const q = rawQuery.trim().toLowerCase();
+  return sessions.map(session => ({
+    session,
+    nameMatch: session.name.toLowerCase().includes(q),
+    matchedTabs: q
+      ? session.tabs.filter(
+          t =>
+            (t.title ?? '').toLowerCase().includes(q) ||
+            (t.url ?? '').toLowerCase().includes(q),
+        )
+      : [],
+  }));
 }
 
 // ─── Crash guard ──────────────────────────────────────────────────────────────
@@ -243,7 +265,9 @@ async function handleMessage({ action, payload = {} }) {
     }
 
     case 'DELETE_SESSION': {
-      await deleteSession(payload.id);
+      // Soft delete: moves to trash so the user can undo (purged after 30d).
+      // Throws if the session is locked — pass { force: true } to override.
+      await trashSession(payload.id, { force: payload.force });
       return { ok: true };
     }
 
@@ -313,40 +337,76 @@ async function handleMessage({ action, payload = {} }) {
     }
 
     case 'EXPORT_SESSIONS': {
-      const sessions = await getAllSessions();
-      const json = JSON.stringify({ version: 1, sessions }, null, 2);
-      return { json };
+      const data = await exportData();
+      return { json: JSON.stringify(data, null, 2) };
     }
 
     case 'IMPORT_SESSIONS': {
-      let parsed;
+      let blob;
       try {
-        parsed = JSON.parse(payload.json);
+        blob = JSON.parse(payload.json);
       } catch {
         throw new Error('Invalid JSON');
       }
-
-      const incoming = parsed.sessions ?? {};
-      const existing = await getAllSessions();
-      let imported = 0;
-      let skipped = 0;
-
-      for (const [id, session] of Object.entries(incoming)) {
-        if (existing[id]) {
-          skipped++;
-        } else {
-          await saveSession({ ...session, id });
-          imported++;
-        }
-      }
-
+      const { imported, skipped } = await importData(blob, payload.mode ?? 'merge');
       return { imported, skipped };
     }
 
     case 'SEARCH_SESSIONS': {
-      const sessions = await getAllSessions();
-      const results = searchSessions(sessions, payload.query ?? '');
-      return { results };
+      const query = payload.query ?? '';
+      const matched = await storageSearch(query);
+      return { results: enrichSearchHits(matched, query) };
+    }
+
+    // ── Trash (soft delete) — backed by storage's trash model ──
+
+    case 'GET_TRASH': {
+      const trash = await getTrash();
+      return { trash };
+    }
+
+    case 'RESTORE_FROM_TRASH': {
+      const session = await restoreFromTrash(payload.id);
+      return { session };
+    }
+
+    case 'DELETE_FROM_TRASH': {
+      await deleteFromTrash(payload.id);
+      return { ok: true };
+    }
+
+    case 'EMPTY_TRASH': {
+      await emptyTrash();
+      return { ok: true };
+    }
+
+    case 'PURGE_TRASH': {
+      const purged = await purgeExpiredTrash(payload.ttlDays);
+      return { purged };
+    }
+
+    // ── Lock (protect from trashing / autosave pruning) ──
+
+    case 'LOCK_SESSION': {
+      const session = await lockSession(payload.id);
+      return { session };
+    }
+
+    case 'UNLOCK_SESSION': {
+      const session = await unlockSession(payload.id);
+      return { session };
+    }
+
+    // ── Misc storage passthroughs ──
+
+    case 'EXPORT_SESSION_TEXT': {
+      const text = await exportSessionAsText(payload.id);
+      return { text };
+    }
+
+    case 'GET_STORAGE_STATS': {
+      const stats = await getStorageStats();
+      return { stats };
     }
 
     // ── Cloud sync (paid) — engine owns the contract, transport is stubbed ──
@@ -380,12 +440,12 @@ async function handleMessage({ action, payload = {} }) {
 
 // ─── Startup ──────────────────────────────────────────────────────────────────
 
-chrome.runtime.onInstalled.addListener(async () => {
+async function bootstrap() {
+  await migrateIfNeeded();       // stamp/upgrade storage schema
   await scheduleAutosave();
   await updateEmergencySnapshot();
-});
+  await purgeExpiredTrash();      // storage delegates trash GC to the engine
+}
 
-chrome.runtime.onStartup.addListener(async () => {
-  await scheduleAutosave();
-  await updateEmergencySnapshot();
-});
+chrome.runtime.onInstalled.addListener(bootstrap);
+chrome.runtime.onStartup.addListener(bootstrap);

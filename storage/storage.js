@@ -41,6 +41,10 @@ const DEFAULT_SETTINGS = {
   maxAutoSessions: 5,
 };
 
+// Trashed sessions older than this are purged by purgeExpiredTrash().
+const TRASH_TTL_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 async function _read(keys) {
@@ -105,6 +109,113 @@ export async function updateSettings(partial) {
   await _write({ settings: { ...current, ...partial } });
 }
 
+// ─── Lock ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Locked sessions are protected: trashSession() refuses to remove them
+ * unless { force: true } is passed. Used to keep important sessions safe
+ * from autosave pruning and accidental deletes.
+ */
+export async function lockSession(id) {
+  const sessions = await getAllSessions();
+  const session = sessions[id];
+  if (!session) throw new Error(`Session ${id} not found`);
+  session.locked = true;
+  session.updatedAt = Date.now();
+  await _write({ sessions });
+  return session;
+}
+
+export async function unlockSession(id) {
+  const sessions = await getAllSessions();
+  const session = sessions[id];
+  if (!session) throw new Error(`Session ${id} not found`);
+  session.locked = false;
+  session.updatedAt = Date.now();
+  await _write({ sessions });
+  return session;
+}
+
+// ─── Trash (soft delete) ────────────────────────────────────────────────────────
+//
+// Schema: chrome.storage.local key `trash` = { [id]: { ...session, trashedAt } }
+// Sessions moved here instead of being deleted outright, so a user can undo.
+
+export async function getTrash() {
+  const { trash = {} } = await _read('trash');
+  return trash;
+}
+
+/**
+ * Moves a session out of the active set and into the trash.
+ * Throws if the session is locked, unless { force: true }.
+ * Returns the trashed entry.
+ */
+export async function trashSession(id, { force = false } = {}) {
+  const sessions = await getAllSessions();
+  const session = sessions[id];
+  if (!session) throw new Error(`Session ${id} not found`);
+  if (session.locked && !force) {
+    throw new Error(`Session ${id} is locked — unlock it before deleting`);
+  }
+
+  const trash = await getTrash();
+  trash[id] = { ...session, trashedAt: Date.now() };
+  delete sessions[id];
+  await _write({ sessions, trash });
+  return trash[id];
+}
+
+/**
+ * Moves a session back from the trash into the active set.
+ * Strips the trashedAt marker. Returns the restored session.
+ */
+export async function restoreFromTrash(id) {
+  const trash = await getTrash();
+  const entry = trash[id];
+  if (!entry) throw new Error(`Trashed session ${id} not found`);
+
+  const { trashedAt, ...session } = entry;
+  const sessions = await getAllSessions();
+  sessions[id] = session;
+  delete trash[id];
+  await _write({ sessions, trash });
+  return session;
+}
+
+/** Permanently removes a single trashed session. */
+export async function deleteFromTrash(id) {
+  const trash = await getTrash();
+  delete trash[id];
+  await _write({ trash });
+}
+
+/** Permanently removes everything in the trash. */
+export async function emptyTrash() {
+  await _write({ trash: {} });
+}
+
+/**
+ * Permanently removes trashed sessions older than TRASH_TTL_DAYS.
+ * Intended to be called by the Core Engine on a schedule / startup.
+ * Returns the number of sessions purged.
+ */
+export async function purgeExpiredTrash(ttlDays = TRASH_TTL_DAYS) {
+  const trash = await getTrash();
+  const cutoff = Date.now() - ttlDays * DAY_MS;
+  let purged = 0;
+
+  for (const [id, entry] of Object.entries(trash)) {
+    if (entry.trashedAt < cutoff) {
+      delete trash[id];
+      purged++;
+    }
+  }
+
+  if (purged > 0) await _write({ trash });
+  return purged;
+}
+
 // ─── Search ───────────────────────────────────────────────────────────────────
 
 /**
@@ -166,6 +277,16 @@ export async function findDuplicateSessions() {
 }
 
 // ─── Export / Import ──────────────────────────────────────────────────────────
+
+/**
+ * Returns a single session's tabs as a newline-separated URL list,
+ * for users who want to copy/paste tabs as plain text.
+ */
+export async function exportSessionAsText(id) {
+  const session = await getSession(id);
+  if (!session) throw new Error(`Session ${id} not found`);
+  return session.tabs.map(t => t.url).join('\n');
+}
 
 /**
  * Serialises all sessions + settings to a plain JS object ready to be

@@ -1,0 +1,14 @@
+{
+  "name": "session-vault",
+  "version": "0.1.0",
+  "description": "Never lose your tabs again. Save, restore, and sync your browser sessions.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

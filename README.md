@@ -104,6 +104,22 @@ const { stats } = await chrome.runtime.sendMessage({ action: 'GET_STORAGE_STATS'
 // One session's tab urls as plain text (newline-joined)
 const { text } = await chrome.runtime.sendMessage({ action: 'EXPORT_SESSION_TEXT', payload: { id } });
 
+// ── Folders (free — basic manual organization; persisted by the storage layer) ──
+// A session belongs to a folder via its `folderId` field (null = unfiled).
+const { folders } = await chrome.runtime.sendMessage({ action: 'GET_FOLDERS' });
+//   folders: { [id]: { id, name, color, createdAt, updatedAt } }
+const { folder } = await chrome.runtime.sendMessage({ action: 'CREATE_FOLDER', payload: { name: 'Research', color: '#2563eb' } }); // color optional
+await chrome.runtime.sendMessage({ action: 'RENAME_FOLDER', payload: { id, name: 'Reading list' } }); // → { folder }
+await chrome.runtime.sendMessage({ action: 'DELETE_FOLDER', payload: { id } });   // → { ok }  (its sessions become unfiled, not deleted)
+// Move a session into a folder (or out with folderId: null)
+await chrome.runtime.sendMessage({ action: 'MOVE_SESSION_TO_FOLDER', payload: { id, folderId } }); // → { session }
+
+// ── Deduplication (Pro) — throws 'PRO_REQUIRED: …' on free ──
+// Remove duplicate-URL tabs within one session:
+const { session, removed } = await chrome.runtime.sendMessage({ action: 'DEDUPLICATE_SESSION', payload: { id } });
+// Find groups of sessions with identical tab sets:
+const { groups } = await chrome.runtime.sendMessage({ action: 'FIND_DUPLICATE_SESSIONS' }); // groups: string[][] of session ids
+
 // ── Entitlements (free vs Pro) — see docs/TIERS.md ──
 // On open: show "N / 50" counter + Upgrade button; lock Autosave when !pro.
 const { entitlements, limits } =
@@ -136,6 +152,16 @@ Session {
   updatedAt:   number
   tabs:        Tab[]
   isAuto:      boolean       // true = created by autosave
+  locked?:     boolean       // protected from delete / autosave pruning
+  folderId?:   string | null // folder it's filed under (null = unfiled)
+}
+
+Folder {
+  id:          string
+  name:        string
+  color:       string | null
+  createdAt:   number
+  updatedAt:   number
 }
 
 Tab {

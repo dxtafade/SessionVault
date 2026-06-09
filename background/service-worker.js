@@ -32,6 +32,17 @@
  *   { action: 'LOCK_SESSION',      payload: { id } }                → { session }
  *   { action: 'UNLOCK_SESSION',    payload: { id } }                → { session }
  *
+ *   Folders (free — basic organization; persistence owned by storage.js):
+ *   { action: 'GET_FOLDERS' }                                        → { folders }
+ *   { action: 'CREATE_FOLDER',     payload: { name, color? } }      → { folder }
+ *   { action: 'RENAME_FOLDER',     payload: { id, name } }          → { folder }
+ *   { action: 'DELETE_FOLDER',     payload: { id, reassignTo? } }   → { ok }   (members reassigned, default unfiled)
+ *   { action: 'MOVE_SESSION_TO_FOLDER', payload: { id, folderId } } → { session }  (folderId null = unfile)
+ *
+ *   Deduplication (Pro):
+ *   { action: 'DEDUPLICATE_SESSION', payload: { id } }              → { session, removed }
+ *   { action: 'FIND_DUPLICATE_SESSIONS' }                            → { groups }   (string[][] of session ids)
+ *
  *   Entitlements (free vs Pro):
  *   { action: 'GET_ENTITLEMENTS' }                                   → { entitlements: { pro }, limits: { freeSessionLimit } }
  *   { action: 'SET_PRO',          payload: { pro } }                → { entitlements }   (dev/stub toggle)
@@ -48,6 +59,8 @@
  *   - Timed autosave runs only for Pro; on free the alarm is never armed.
  *   - Free is capped at 50 manually-saved sessions; SAVE_SESSION / DUPLICATE_SESSION
  *     throw 'FREE_LIMIT_REACHED: …' at the cap (UI matches the prefix → upgrade prompt).
+ *   - Folders are FREE (basic manual organization). Deduplication is Pro:
+ *     DEDUPLICATE_SESSION / FIND_DUPLICATE_SESSIONS throw 'PRO_REQUIRED: …' on free.
  *   - Crash recovery (RECOVER_LAST), import, and trash are exempt — the safety
  *     net always works regardless of plan.
  */
@@ -73,6 +86,13 @@ import {
   importData,
   exportSessionAsText,
   getStorageStats,
+  deduplicateTabs,
+  findDuplicateSessions,
+  getFolders,
+  createFolder,
+  renameFolder,
+  deleteFolder,
+  assignSessionToFolder,
 } from '../storage/storage.js';
 
 import * as sync from './sync.js';
@@ -136,6 +156,7 @@ async function saveCurrentSession(name, isAuto = false) {
     updatedAt: now,
     tabs,
     isAuto,
+    folderId: null, // unfiled until moved into a folder
   };
   await saveSession(session);
   return session;
@@ -198,6 +219,15 @@ async function assertCanSaveManual() {
         'Delete some or upgrade to Pro.',
     );
   }
+}
+
+// Stable error prefix the UI matches on to show an upgrade prompt for a
+// Pro-only feature (e.g. deduplication).
+const PRO_REQUIRED_ERROR = 'PRO_REQUIRED';
+
+async function assertPro(feature) {
+  if (await isPro()) return;
+  throw new Error(`${PRO_REQUIRED_ERROR}: "${feature}" is a Pro feature. Upgrade to use it.`);
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────
@@ -443,6 +473,55 @@ async function handleMessage({ action, payload = {} }) {
     case 'GET_STORAGE_STATS': {
       const stats = await getStorageStats();
       return { stats };
+    }
+
+    // ── Folders (free — basic manual organization) ──
+
+    case 'GET_FOLDERS': {
+      const folders = await getFolders();
+      return { folders };
+    }
+
+    case 'CREATE_FOLDER': {
+      if (!(payload.name ?? '').trim()) throw new Error('Folder name is required');
+      const folder = await createFolder(payload.name.trim(), { color: payload.color ?? null });
+      return { folder };
+    }
+
+    case 'RENAME_FOLDER': {
+      if (!(payload.name ?? '').trim()) throw new Error('Folder name is required');
+      const folder = await renameFolder(payload.id, payload.name.trim());
+      return { folder };
+    }
+
+    case 'DELETE_FOLDER': {
+      // Storage reassigns member sessions (default → unfiled); they're never deleted.
+      await deleteFolder(payload.id, { reassignTo: payload.reassignTo ?? null });
+      return { ok: true };
+    }
+
+    case 'MOVE_SESSION_TO_FOLDER': {
+      // folderId null/undefined → unfile. Storage validates the target folder.
+      const session = await assignSessionToFolder(payload.id, payload.folderId ?? null);
+      return { session };
+    }
+
+    // ── Deduplication (Pro) ──
+
+    case 'DEDUPLICATE_SESSION': {
+      await assertPro('Deduplication');
+      const source = await getSession(payload.id);
+      if (!source) throw new Error(`Session ${payload.id} not found`);
+      const deduped = { ...deduplicateTabs(source), updatedAt: Date.now() };
+      await saveSession(deduped);
+      const removed = source.tabs.length - deduped.tabs.length;
+      return { session: deduped, removed };
+    }
+
+    case 'FIND_DUPLICATE_SESSIONS': {
+      await assertPro('Deduplication');
+      const groups = await findDuplicateSessions();
+      return { groups };
     }
 
     // ── Entitlements (free vs Pro) ──

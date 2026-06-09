@@ -15,7 +15,7 @@ room, organization.
 | Export / import | JSON backup, schema-validated |
 | Trash (soft delete) | 30-day undo before purge |
 | Lock | Protect a session from delete / pruning |
-| Basic folders | Manual organization *(UI/Storage — planned)* |
+| Basic folders | Manual organization — wired (storage owns persistence); UI pending |
 | **Up to 50 saved sessions** | Manual saves only; autosaves & trash don't count |
 
 ## Pro
@@ -26,7 +26,7 @@ room, organization.
 | Encrypted cloud sync + multi-device | Scaffolded (`sync.js`), transport stubbed |
 | Unlimited / long history | Lift the 50-session cap |
 | Smart folders (auto-rules), project spaces | Planned |
-| Tab deduplication | Storage helpers exist (`deduplicateTabs`, `findDuplicateSessions`) |
+| Tab deduplication | Wired & Pro-gated (`DEDUPLICATE_SESSION`, `FIND_DUPLICATE_SESSIONS`) |
 
 ## How the gate works (engine)
 
@@ -38,6 +38,8 @@ room, organization.
   `assertCanSaveManual()`, which throws `FREE_LIMIT_REACHED: …` when a free user
   is at the cap. No data is ever deleted — the user clears space or upgrades.
 - **Exempt from the cap:** `RECOVER_LAST` and `IMPORT_SESSIONS` (recovery flows).
+- **Pro-only actions** (dedup) call `assertPro()`, which throws `PRO_REQUIRED: …`.
+  Folders are free and ungated.
 
 ## Toggling Pro while building
 

@@ -17,6 +17,13 @@
  *   { action: 'RECOVER_LAST',      payload: { name? } }             → { session | null }
  *   { action: 'EXPORT_SESSIONS' }                                    → { json }
  *   { action: 'IMPORT_SESSIONS',   payload: { json } }              → { imported, skipped }
+ *   { action: 'SEARCH_SESSIONS',   payload: { query } }             → { results }
+ *   { action: 'GET_SYNC_STATUS' }                                    → { status }
+ *   { action: 'SET_SYNC_ENABLED', payload: { enabled, credentials? } } → { status }
+ *   { action: 'SYNC_NOW' }                                           → { status }
+ *
+ * SEARCH_SESSIONS result item: { session, matchedTabs: Tab[], nameMatch: boolean }
+ * Sync status shape: { enabled, state, lastSync, error } — see sync.js
  */
 
 import {
@@ -27,6 +34,8 @@ import {
   getSettings,
   updateSettings,
 } from '../storage/storage.js';
+
+import * as sync from './sync.js';
 
 // ─── URL filtering ────────────────────────────────────────────────────────────
 
@@ -128,6 +137,33 @@ async function pruneAutoSessions() {
   for (const s of autoSessions.slice(settings.maxAutoSessions)) {
     await deleteSession(s.id);
   }
+}
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+// Free-tier basic search: matches the query against session name and each
+// tab's title/url. Returns sessions that matched plus the tabs that matched,
+// so the UI can highlight hits.
+
+function searchSessions(sessions, rawQuery) {
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) return [];
+
+  const results = [];
+  for (const session of Object.values(sessions)) {
+    const nameMatch = session.name.toLowerCase().includes(query);
+    const matchedTabs = session.tabs.filter(
+      t =>
+        (t.title ?? '').toLowerCase().includes(query) ||
+        (t.url ?? '').toLowerCase().includes(query),
+    );
+
+    if (nameMatch || matchedTabs.length > 0) {
+      results.push({ session, matchedTabs, nameMatch });
+    }
+  }
+
+  // Most recently created first
+  return results.sort((a, b) => b.session.createdAt - a.session.createdAt);
 }
 
 // ─── Crash guard ──────────────────────────────────────────────────────────────
@@ -305,6 +341,36 @@ async function handleMessage({ action, payload = {} }) {
       }
 
       return { imported, skipped };
+    }
+
+    case 'SEARCH_SESSIONS': {
+      const sessions = await getAllSessions();
+      const results = searchSessions(sessions, payload.query ?? '');
+      return { results };
+    }
+
+    // ── Cloud sync (paid) — engine owns the contract, transport is stubbed ──
+
+    case 'GET_SYNC_STATUS': {
+      const status = await sync.getStatus();
+      return { status };
+    }
+
+    case 'SET_SYNC_ENABLED': {
+      const status = payload.enabled
+        ? await sync.enable(payload.credentials)
+        : await sync.disable();
+      return { status };
+    }
+
+    case 'SYNC_NOW': {
+      const localSessions = await getAllSessions();
+      const { status, merged } = await sync.sync(localSessions);
+      // Persist anything the merge pulled down
+      for (const session of Object.values(merged)) {
+        await saveSession(session);
+      }
+      return { status };
     }
 
     default:

@@ -75,6 +75,25 @@ await chrome.runtime.sendMessage({
   action: 'UPDATE_SETTINGS',
   payload: { autosaveEnabled: true, autosaveInterval: 15 }
 });
+
+// Search across session names + tab titles/urls (free tier)
+// result item: { session, matchedTabs: Tab[], nameMatch: boolean }
+const { results } = await chrome.runtime.sendMessage({
+  action: 'SEARCH_SESSIONS',
+  payload: { query: 'github' }
+});
+
+// ── Cloud sync (paid) — transport is stubbed for now, contract is stable ──
+
+// status: { enabled, state: 'idle'|'syncing'|'error'|'disabled', lastSync, error }
+const { status } = await chrome.runtime.sendMessage({ action: 'GET_SYNC_STATUS' });
+
+await chrome.runtime.sendMessage({
+  action: 'SET_SYNC_ENABLED',
+  payload: { enabled: true, credentials: { /* TBD */ } }
+});
+
+await chrome.runtime.sendMessage({ action: 'SYNC_NOW' });
 ```
 
 ## Data shapes

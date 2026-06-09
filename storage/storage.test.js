@@ -201,6 +201,33 @@ describe('getStorageUsage', () => {
   });
 });
 
+describe('getStorageStats', () => {
+  it('aggregates session, tab, and trash counts', async () => {
+    await store.saveSession(
+      makeSession('a', 'Manual', [makeTab('https://x.com'), makeTab('https://y.com')])
+    );
+    await store.saveSession(
+      makeSession('b', 'Auto', [makeTab('https://z.com')], { isAuto: true })
+    );
+    await store.saveSession(makeSession('c', 'Locked', [], { locked: true }));
+    await store.saveSession(makeSession('d', 'Trashed'));
+    await store.trashSession('d');
+
+    const stats = await store.getStorageStats();
+    expect(stats.sessions).toEqual({ total: 3, auto: 1, manual: 2, locked: 1 });
+    expect(stats.totalTabs).toBe(3);
+    expect(stats.trashCount).toBe(1);
+    expect(stats.usage.quota).toBe(10_485_760);
+  });
+
+  it('reports zeroes for empty storage', async () => {
+    const stats = await store.getStorageStats();
+    expect(stats.sessions).toEqual({ total: 0, auto: 0, manual: 0, locked: 0 });
+    expect(stats.totalTabs).toBe(0);
+    expect(stats.trashCount).toBe(0);
+  });
+});
+
 // ─── Lock ───────────────────────────────────────────────────────────────────────
 
 describe('lock / unlock', () => {

@@ -348,6 +348,42 @@ export async function getStorageUsage() {
   return { used, quota, percent: Math.round((used / quota) * 100) };
 }
 
+/**
+ * Aggregate stats for a future UI dashboard. Combines session/tab/trash
+ * counts with raw byte usage in a single round-trip-friendly shape:
+ *
+ * {
+ *   sessions: { total, auto, manual, locked },
+ *   totalTabs: number,
+ *   trashCount: number,
+ *   usage: { used, quota, percent }
+ * }
+ */
+export async function getStorageStats() {
+  const [sessionsMap, trash, usage] = await Promise.all([
+    getAllSessions(),
+    getTrash(),
+    getStorageUsage(),
+  ]);
+
+  const sessions = Object.values(sessionsMap);
+  const auto = sessions.filter(s => s.isAuto).length;
+  const locked = sessions.filter(s => s.locked).length;
+  const totalTabs = sessions.reduce((sum, s) => sum + s.tabs.length, 0);
+
+  return {
+    sessions: {
+      total: sessions.length,
+      auto,
+      manual: sessions.length - auto,
+      locked,
+    },
+    totalTabs,
+    trashCount: Object.keys(trash).length,
+    usage,
+  };
+}
+
 // ─── Validation ───────────────────────────────────────────────────────────────
 
 function isValidSession(s) {

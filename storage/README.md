@@ -3,9 +3,10 @@
 All read/write to `chrome.storage.local` lives here. The Core Engine and UI
 call these functions — they never touch `chrome.storage` directly.
 
-- [`storage.js`](storage.js) — sessions, settings, search, dedup, trash, lock, export/import, stats
-- [`file-transfer.js`](file-transfer.js) — JSON file download/upload (popup context)
-- Tests: [`storage.test.js`](storage.test.js), [`file-transfer.test.js`](file-transfer.test.js) — run `npm test`
+- [`storage.js`](storage.js) — sessions, settings, search, dedup, trash, lock, folders, tags, archive, export/import, stats
+- [`file-transfer.js`](file-transfer.js) — JSON/gzip file download/upload (popup context)
+- [`gzip.js`](gzip.js) — gzip + base64 helpers (shared by archive + file-transfer)
+- Tests: `*.test.js` in this folder — run `npm test` (65 tests)
 
 > **Storage owns these files only.** Wiring any of this into the message API
 > (`background/service-worker.js`) is the Core Engine's job.
@@ -21,6 +22,8 @@ Session {
   tabs: Tab[]
   isAuto: boolean        // true = created by autosave
   locked?: boolean       // protected from trashing
+  folderId?: string|null // smart folders / project spaces
+  tags?: string[]        // free-form labels (normalized lowercase)
 }
 
 Tab {
@@ -29,6 +32,24 @@ Tab {
   favIconUrl: string
   pinned: boolean
   index: number
+  windowIndex?: number   // set by Core's multi-window capture
+}
+
+Folder {
+  id: string
+  name: string
+  color?: string|null
+  createdAt: number
+  updatedAt: number
+}
+
+ArchivedEntry {           // metadata is plain; payload is compressed
+  id: string
+  name: string
+  createdAt: number
+  archivedAt: number
+  tabCount: number
+  data: string            // base64(gzip(JSON(session)))
 }
 
 Settings {
@@ -38,7 +59,7 @@ Settings {
 }
 ```
 
-Storage keys: `sessions`, `settings`, `trash`, `_schemaVersion` (current: **1**).
+Storage keys: `sessions`, `settings`, `trash`, `folders`, `archive`, `_schemaVersion` (current: **2**).
 
 ## `storage.js` API
 
@@ -80,6 +101,35 @@ Storage keys: `sessions`, `settings`, `trash`, `_schemaVersion` (current: **1**)
 | `emptyTrash()` | `void` | Permanent, all |
 | `purgeExpiredTrash(ttlDays = 30)` | `number` | Count purged; call on a schedule |
 
+### Folders / project spaces
+| Function | Returns | Notes |
+|---|---|---|
+| `getFolders()` | `{ [id]: Folder }` | |
+| `getFolder(id)` | `Folder \| null` | |
+| `createFolder(name, { color? })` | `Folder` | |
+| `renameFolder(id, name)` | `Folder` | |
+| `deleteFolder(id, { reassignTo = null })` | `void` | Sessions inside move to `reassignTo` — never lost |
+| `assignSessionToFolder(id, folderId\|null)` | `Session` | `null` = unfiled |
+| `getSessionsInFolder(folderId\|null)` | `Session[]` | newest-first; `null` = unfiled |
+
+### Tags
+| Function | Returns | Notes |
+|---|---|---|
+| `addTag(id, tag)` | `Session` | Normalized lowercase, de-duplicated |
+| `removeTag(id, tag)` | `Session` | Case-insensitive |
+| `getAllTags()` | `string[]` | Distinct, sorted |
+| `getSessionsByTag(tag)` | `Session[]` | newest-first |
+
+### Archive (long history)
+| Function | Returns | Notes |
+|---|---|---|
+| `getArchive()` | `{ [id]: ArchivedEntry }` | Raw (payloads compressed) |
+| `listArchived()` | `Array<{id,name,createdAt,archivedAt,tabCount}>` | Metadata only, newest-first |
+| `archiveSession(id)` | `ArchivedEntry` | Moves out of active set, gzips payload |
+| `restoreArchived(id)` | `Session` | Decompresses back into active set |
+| `deleteArchived(id)` | `void` | Permanent |
+| `autoArchiveOldSessions({ olderThanDays = 30, keepRecent = 50 })` | `number` | Count archived; skips locked; call on a schedule |
+
 ### Export / import
 | Function | Returns | Notes |
 |---|---|---|
@@ -91,8 +141,19 @@ Storage keys: `sessions`, `settings`, `trash`, `_schemaVersion` (current: **1**)
 | Function | Returns |
 |---|---|
 | `getStorageUsage()` | `{ used, quota, percent }` |
-| `getStorageStats()` | `{ sessions: { total, auto, manual, locked }, totalTabs, trashCount, usage }` |
+| `getStorageStats()` | `{ sessions: { total, auto, manual, locked }, totalTabs, trashCount, archivedCount, folderCount, usage }` |
 | `migrateIfNeeded()` | `void` — stamp schema version (call on install/update) |
+
+## `gzip.js` API
+
+Environment-agnostic (SW / popup / Node).
+
+| Function | Returns | Notes |
+|---|---|---|
+| `gzipString(text)` | `Promise<Uint8Array>` | Gzip-compress (CompressionStream) |
+| `gunzipToString(bytes)` | `Promise<string>` | Decompress |
+| `bytesToBase64(bytes)` / `base64ToBytes(b64)` | — | chunk-safe base64 |
+| `compressToBase64(text)` / `decompressFromBase64(b64)` | `Promise<string>` | chrome.storage-safe compressed string |
 
 ## `file-transfer.js` API
 
@@ -131,9 +192,14 @@ importBtn.addEventListener('click', async () => {
 
 ## Pending Core Engine wiring
 
-These storage ops have no message-API action yet — for the Core dev to add to
-`background/service-worker.js`:
+Trash, lock, search, export/import, stats, and migration are already wired by
+Dexter (Core) as of `98a8475`.
 
-`trashSession`, `restoreFromTrash`, `deleteFromTrash`, `emptyTrash`, `getTrash`,
-`purgeExpiredTrash`, `lockSession`, `unlockSession`, `exportSessionAsText`,
-`getStorageStats`.
+Still no message-API action — for Dexter to add to `background/service-worker.js`
+when the UI needs them:
+
+- **Folders:** `createFolder`, `renameFolder`, `deleteFolder`, `getFolders`,
+  `assignSessionToFolder`, `getSessionsInFolder`
+- **Tags:** `addTag`, `removeTag`, `getAllTags`, `getSessionsByTag`
+- **Archive:** `archiveSession`, `restoreArchived`, `deleteArchived`,
+  `listArchived`, `autoArchiveOldSessions` (good candidate for a startup/alarm call)

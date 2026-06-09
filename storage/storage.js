@@ -4,7 +4,7 @@
  * Responsibility: all read/write to chrome.storage.
  * Called by the Core Engine and UI — never calls them directly.
  *
- * Storage schema version: 1
+ * Storage schema version: 2
  *
  * Session shape:
  * {
@@ -13,27 +13,28 @@
  *   createdAt: number,   // unix ms
  *   updatedAt: number,
  *   tabs: Tab[],
- *   isAuto: boolean
+ *   isAuto: boolean,
+ *   locked?: boolean,
+ *   folderId?: string | null,   // smart folders / project spaces
+ *   tags?: string[]             // free-form labels
  * }
  *
  * Tab shape:
- * {
- *   url: string,
- *   title: string,
- *   favIconUrl: string,
- *   pinned: boolean,
- *   index: number
- * }
+ * { url, title, favIconUrl, pinned, index, windowIndex? }
+ *
+ * Folder shape (key `folders` = { [id]: Folder }):
+ * { id, name, color?, createdAt, updatedAt }
+ *
+ * Archive entry (key `archive` = { [id]: ArchivedEntry }):
+ * { id, name, createdAt, archivedAt, tabCount, data }  // data = base64(gzip(JSON(session)))
  *
  * Settings shape:
- * {
- *   autosaveEnabled: boolean,
- *   autosaveInterval: number,  // minutes
- *   maxAutoSessions: number
- * }
+ * { autosaveEnabled, autosaveInterval (min), maxAutoSessions }
  */
 
-const SCHEMA_VERSION = 1;
+import { compressToBase64, decompressFromBase64 } from './gzip.js';
+
+const SCHEMA_VERSION = 2;
 
 const DEFAULT_SETTINGS = {
   autosaveEnabled: true,
@@ -62,10 +63,13 @@ async function _write(data) {
  * migrations know where to start.
  */
 export async function migrateIfNeeded() {
-  const { _schemaVersion } = await _read('_schemaVersion');
+  const { _schemaVersion = 0 } = await _read('_schemaVersion');
   if (_schemaVersion === SCHEMA_VERSION) return;
 
-  // v0 → v1: nothing to transform, just stamp the version
+  // v0 → v1: original skeleton, no transform needed.
+  // v1 → v2: smart folders, tags, and archive added. The new fields are all
+  //          optional and the new keys default to {} on read, so no data
+  //          transform is required — just stamp the version.
   await _write({ _schemaVersion: SCHEMA_VERSION });
 }
 
@@ -356,13 +360,17 @@ export async function getStorageUsage() {
  *   sessions: { total, auto, manual, locked },
  *   totalTabs: number,
  *   trashCount: number,
+ *   archivedCount: number,
+ *   folderCount: number,
  *   usage: { used, quota, percent }
  * }
  */
 export async function getStorageStats() {
-  const [sessionsMap, trash, usage] = await Promise.all([
+  const [sessionsMap, trash, archive, folders, usage] = await Promise.all([
     getAllSessions(),
     getTrash(),
+    getArchive(),
+    getFolders(),
     getStorageUsage(),
   ]);
 
@@ -380,8 +388,211 @@ export async function getStorageStats() {
     },
     totalTabs,
     trashCount: Object.keys(trash).length,
+    archivedCount: Object.keys(archive).length,
+    folderCount: Object.keys(folders).length,
     usage,
   };
+}
+
+// ─── Smart folders / project spaces ──────────────────────────────────────────────
+//
+// Folders are named containers; a session points at one via `folderId`
+// (null/absent = unfiled). Stored under key `folders` = { [id]: Folder }.
+
+function _folderId() {
+  return `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export async function getFolders() {
+  const { folders = {} } = await _read('folders');
+  return folders;
+}
+
+export async function getFolder(id) {
+  const folders = await getFolders();
+  return folders[id] ?? null;
+}
+
+export async function createFolder(name, { color = null } = {}) {
+  const folders = await getFolders();
+  const now = Date.now();
+  const folder = { id: _folderId(), name, color, createdAt: now, updatedAt: now };
+  folders[folder.id] = folder;
+  await _write({ folders });
+  return folder;
+}
+
+export async function renameFolder(id, name) {
+  const folders = await getFolders();
+  if (!folders[id]) throw new Error(`Folder ${id} not found`);
+  folders[id] = { ...folders[id], name, updatedAt: Date.now() };
+  await _write({ folders });
+  return folders[id];
+}
+
+/**
+ * Deletes a folder. Any sessions inside are reassigned to `reassignTo`
+ * (default null = unfiled) so sessions are never lost with the folder.
+ */
+export async function deleteFolder(id, { reassignTo = null } = {}) {
+  const folders = await getFolders();
+  if (!folders[id]) return;
+  delete folders[id];
+
+  const sessions = await getAllSessions();
+  for (const s of Object.values(sessions)) {
+    if (s.folderId === id) s.folderId = reassignTo;
+  }
+  await _write({ folders, sessions });
+}
+
+/** Sets (or clears, with null) a session's folder. */
+export async function assignSessionToFolder(sessionId, folderId) {
+  const sessions = await getAllSessions();
+  const session = sessions[sessionId];
+  if (!session) throw new Error(`Session ${sessionId} not found`);
+  if (folderId !== null) {
+    const folders = await getFolders();
+    if (!folders[folderId]) throw new Error(`Folder ${folderId} not found`);
+  }
+  session.folderId = folderId;
+  session.updatedAt = Date.now();
+  await _write({ sessions });
+  return session;
+}
+
+/** Sessions in a folder (folderId = null returns unfiled), newest-first. */
+export async function getSessionsInFolder(folderId) {
+  const sessions = Object.values(await getAllSessions());
+  return sessions
+    .filter(s => (s.folderId ?? null) === folderId)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+// ─── Tags ─────────────────────────────────────────────────────────────────────
+
+export async function addTag(sessionId, tag) {
+  const clean = String(tag).trim().toLowerCase();
+  if (!clean) throw new Error('Tag cannot be empty');
+  const sessions = await getAllSessions();
+  const session = sessions[sessionId];
+  if (!session) throw new Error(`Session ${sessionId} not found`);
+  const tags = new Set(session.tags ?? []);
+  tags.add(clean);
+  session.tags = [...tags];
+  session.updatedAt = Date.now();
+  await _write({ sessions });
+  return session;
+}
+
+export async function removeTag(sessionId, tag) {
+  const clean = String(tag).trim().toLowerCase();
+  const sessions = await getAllSessions();
+  const session = sessions[sessionId];
+  if (!session) throw new Error(`Session ${sessionId} not found`);
+  session.tags = (session.tags ?? []).filter(t => t !== clean);
+  session.updatedAt = Date.now();
+  await _write({ sessions });
+  return session;
+}
+
+/** All distinct tags across sessions, sorted alphabetically. */
+export async function getAllTags() {
+  const sessions = Object.values(await getAllSessions());
+  const tags = new Set();
+  for (const s of sessions) for (const t of s.tags ?? []) tags.add(t);
+  return [...tags].sort();
+}
+
+/** Sessions carrying a given tag, newest-first. */
+export async function getSessionsByTag(tag) {
+  const clean = String(tag).trim().toLowerCase();
+  const sessions = Object.values(await getAllSessions());
+  return sessions
+    .filter(s => (s.tags ?? []).includes(clean))
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+// ─── Long history / archive ───────────────────────────────────────────────────────
+//
+// Archived sessions move OUT of the hot `sessions` map into `archive`, where
+// each session's payload is gzipped + base64'd to keep long histories well
+// under the chrome.storage quota. Listing stays cheap (metadata is plain);
+// only restore pays the decompress cost.
+
+export async function getArchive() {
+  const { archive = {} } = await _read('archive');
+  return archive;
+}
+
+/** Lightweight metadata for every archived session, newest-first. No payloads. */
+export async function listArchived() {
+  const archive = await getArchive();
+  return Object.values(archive)
+    .map(({ id, name, createdAt, archivedAt, tabCount }) => ({
+      id, name, createdAt, archivedAt, tabCount,
+    }))
+    .sort((a, b) => b.archivedAt - a.archivedAt);
+}
+
+/** Moves a session from the active set into the compressed archive. */
+export async function archiveSession(id) {
+  const sessions = await getAllSessions();
+  const session = sessions[id];
+  if (!session) throw new Error(`Session ${id} not found`);
+
+  const archive = await getArchive();
+  archive[id] = {
+    id,
+    name: session.name,
+    createdAt: session.createdAt,
+    archivedAt: Date.now(),
+    tabCount: session.tabs.length,
+    data: await compressToBase64(JSON.stringify(session)),
+  };
+  delete sessions[id];
+  await _write({ sessions, archive });
+  return archive[id];
+}
+
+/** Decompresses an archived session back into the active set. */
+export async function restoreArchived(id) {
+  const archive = await getArchive();
+  const entry = archive[id];
+  if (!entry) throw new Error(`Archived session ${id} not found`);
+
+  const session = JSON.parse(await decompressFromBase64(entry.data));
+  const sessions = await getAllSessions();
+  sessions[id] = session;
+  delete archive[id];
+  await _write({ sessions, archive });
+  return session;
+}
+
+/** Permanently removes an archived session. */
+export async function deleteArchived(id) {
+  const archive = await getArchive();
+  delete archive[id];
+  await _write({ archive });
+}
+
+/**
+ * Archives active sessions older than `olderThanDays`, keeping the
+ * `keepRecent` newest untouched regardless of age. Locked sessions are
+ * never auto-archived. Returns the number archived. Intended for the
+ * Core Engine to call on a schedule to bound the hot set.
+ */
+export async function autoArchiveOldSessions({ olderThanDays = 30, keepRecent = 50 } = {}) {
+  const cutoff = Date.now() - olderThanDays * DAY_MS;
+  const sessions = Object.values(await getAllSessions())
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  const candidates = sessions
+    .slice(keepRecent)
+    .filter(s => !s.locked && s.createdAt < cutoff);
+
+  for (const s of candidates) await archiveSession(s.id);
+  return candidates.length;
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────

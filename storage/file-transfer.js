@@ -11,6 +11,10 @@
  */
 
 import { exportData, importData } from './storage.js';
+import { gzipString, gunzipToString } from './gzip.js';
+
+// Re-export so existing callers can keep importing gzip from file-transfer.
+export { gzipString, gunzipToString } from './gzip.js';
 
 // ─── Pure helpers (safe anywhere, easy to test) ─────────────────────────────────
 
@@ -38,28 +42,6 @@ export async function readJSONFile(file) {
   } catch {
     throw new Error('File is not valid JSON');
   }
-}
-
-// ─── Gzip helpers (CompressionStream — works in MV3 + Node 18+) ──────────────────
-
-/** Gzip-compresses a string, returns the bytes. */
-export async function gzipString(text) {
-  const cs = new CompressionStream('gzip');
-  const writer = cs.writable.getWriter();
-  writer.write(new TextEncoder().encode(text));
-  writer.close();
-  const buf = await new Response(cs.readable).arrayBuffer();
-  return new Uint8Array(buf);
-}
-
-/** Decompresses gzip bytes back into a string. */
-export async function gunzipToString(bytes) {
-  const ds = new DecompressionStream('gzip');
-  const writer = ds.writable.getWriter();
-  writer.write(bytes);
-  writer.close();
-  const buf = await new Response(ds.readable).arrayBuffer();
-  return new TextDecoder().decode(buf);
 }
 
 // ─── DOM-backed helpers (popup context only) ─────────────────────────────────────

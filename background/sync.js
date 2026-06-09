@@ -45,18 +45,32 @@ async function setStatus(partial) {
   return next;
 }
 
-// ─── Encryption (STUB) ─────────────────────────────────────────────────────────
-// TODO(core): replace with real client-side encryption (e.g. AES-GCM via
-// SubtleCrypto, key derived from the user's passphrase with PBKDF2).
-// Until then these are identity functions so the data flow can be wired up.
+// ─── Encryption ────────────────────────────────────────────────────────────────
+//
+// AGREED CONTRACT with Storage (see docs/CRYPTO_CONTRACT.md). Storage ships
+// `storage/crypto.js` implementing exactly:
+//
+//   encryptBlob(obj: object, passphrase: string): Promise<string>
+//   decryptBlob(cipher: string, passphrase: string): Promise<object>
+//
+//   - AES-GCM over JSON.stringify(obj); key = PBKDF2(passphrase) via SubtleCrypto.
+//   - encryptBlob returns one transport/storage-safe string (salt + iv + ct, base64),
+//     self-contained so decrypt needs only the cipher + passphrase.
+//   - decryptBlob throws on a wrong passphrase or tampered data; the message
+//     starts with 'DECRYPT_FAILED' so sync can surface "wrong passphrase".
+//
+// SWAP-IN: when storage/crypto.js lands, delete the two stubs below and
+// uncomment this import — the call sites already match the signature.
+// import { encryptBlob, decryptBlob } from '../storage/crypto.js';
 
-async function encrypt(plainObject) {
-  return JSON.stringify(plainObject);
+// --- temporary identity stubs (signature-compatible) ---------------------------
+async function encryptBlob(obj, _passphrase) {
+  return JSON.stringify(obj);
 }
-
-async function decrypt(cipherText) {
-  return JSON.parse(cipherText);
+async function decryptBlob(cipher, _passphrase) {
+  return JSON.parse(cipher);
 }
+// -------------------------------------------------------------------------------
 
 // ─── Remote transport (STUB) ───────────────────────────────────────────────────
 // TODO(core): implement against the sync backend once chosen.
@@ -85,12 +99,14 @@ export async function disable() {
  * Push local sessions up and merge remote sessions down.
  *
  * @param {Object} localSessions  { [id]: Session } from storage
+ * @param {Object} [opts]
+ * @param {string} [opts.passphrase]  E2E passphrase — supplied per-sync by the
+ *        UI, never persisted (keeping it off disk is the point of E2E crypto).
  * @returns {Promise<{ status, merged: Object }>}  merged = sessions to persist
  *
- * Merge policy (last-write-wins by updatedAt) is documented here so the
- * Storage dev can rely on it; implementation is stubbed.
+ * Merge policy: last-write-wins by updatedAt (see mergeSessions).
  */
-export async function sync(localSessions) {
+export async function sync(localSessions, { passphrase } = {}) {
   const status = await getStatus();
   if (!status.enabled) {
     return { status, merged: localSessions };
@@ -98,11 +114,11 @@ export async function sync(localSessions) {
 
   await setStatus({ state: 'syncing', error: null });
   try {
-    const blob = await encrypt({ sessions: localSessions });
+    const blob = await encryptBlob({ sessions: localSessions }, passphrase);
     await pushRemote(blob);
 
     const remoteBlob = await pullRemote();
-    const remote = remoteBlob ? await decrypt(remoteBlob) : { sessions: {} };
+    const remote = remoteBlob ? await decryptBlob(remoteBlob, passphrase) : { sessions: {} };
     const merged = mergeSessions(localSessions, remote.sessions);
 
     const next = await setStatus({ state: 'idle', lastSync: Date.now() });

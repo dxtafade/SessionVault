@@ -38,6 +38,7 @@
  *   { action: 'RENAME_FOLDER',     payload: { id, name } }          → { folder }
  *   { action: 'DELETE_FOLDER',     payload: { id, reassignTo? } }   → { ok }   (members reassigned, default unfiled)
  *   { action: 'MOVE_SESSION_TO_FOLDER', payload: { id, folderId } } → { session }  (folderId null = unfile)
+ *   { action: 'GET_SESSIONS_IN_FOLDER', payload: { folderId } }     → { sessions }  (array; folderId null = unfiled)
  *
  *   Deduplication (Pro):
  *   { action: 'DEDUPLICATE_SESSION', payload: { id } }              → { session, removed }
@@ -50,7 +51,7 @@
  *   Cloud sync (paid, stubbed):
  *   { action: 'GET_SYNC_STATUS' }                                    → { status }
  *   { action: 'SET_SYNC_ENABLED', payload: { enabled, credentials? } } → { status }
- *   { action: 'SYNC_NOW' }                                           → { status }
+ *   { action: 'SYNC_NOW',         payload: { passphrase? } }        → { status }   (passphrase = E2E key, never persisted)
  *
  * SEARCH_SESSIONS result item: { session, matchedTabs: Tab[], nameMatch: boolean }
  * Sync status shape: { enabled, state, lastSync, error } — see sync.js
@@ -93,6 +94,7 @@ import {
   renameFolder,
   deleteFolder,
   assignSessionToFolder,
+  getSessionsInFolder,
 } from '../storage/storage.js';
 
 import * as sync from './sync.js';
@@ -506,6 +508,12 @@ async function handleMessage({ action, payload = {} }) {
       return { session };
     }
 
+    case 'GET_SESSIONS_IN_FOLDER': {
+      // folderId null → unfiled sessions. Returns array, newest-first.
+      const sessions = await getSessionsInFolder(payload.folderId ?? null);
+      return { sessions };
+    }
+
     // ── Deduplication (Pro) ──
 
     case 'DEDUPLICATE_SESSION': {
@@ -554,7 +562,7 @@ async function handleMessage({ action, payload = {} }) {
 
     case 'SYNC_NOW': {
       const localSessions = await getAllSessions();
-      const { status, merged } = await sync.sync(localSessions);
+      const { status, merged } = await sync.sync(localSessions, { passphrase: payload.passphrase });
       // Persist anything the merge pulled down
       for (const session of Object.values(merged)) {
         await saveSession(session);

@@ -113,6 +113,8 @@ await chrome.runtime.sendMessage({ action: 'RENAME_FOLDER', payload: { id, name:
 await chrome.runtime.sendMessage({ action: 'DELETE_FOLDER', payload: { id } });   // → { ok }  (its sessions become unfiled, not deleted)
 // Move a session into a folder (or out with folderId: null)
 await chrome.runtime.sendMessage({ action: 'MOVE_SESSION_TO_FOLDER', payload: { id, folderId } }); // → { session }
+// Sessions in a folder (folderId: null → unfiled), newest-first
+const { sessions } = await chrome.runtime.sendMessage({ action: 'GET_SESSIONS_IN_FOLDER', payload: { folderId } });
 
 // ── Deduplication (Pro) — throws 'PRO_REQUIRED: …' on free ──
 // Remove duplicate-URL tabs within one session:
@@ -139,7 +141,8 @@ await chrome.runtime.sendMessage({
   payload: { enabled: true, credentials: { /* TBD */ } }
 });
 
-await chrome.runtime.sendMessage({ action: 'SYNC_NOW' });
+// passphrase = end-to-end key, supplied per-sync, never persisted. See docs/CRYPTO_CONTRACT.md
+await chrome.runtime.sendMessage({ action: 'SYNC_NOW', payload: { passphrase } });
 ```
 
 ## Data shapes

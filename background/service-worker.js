@@ -5,7 +5,7 @@
  * Talks to Storage via storage.js and exposes a message API for the UI.
  *
  * Message API (chrome.runtime.sendMessage / popup → engine):
- *   { action: 'SAVE_SESSION',      payload: { name } }              → { session }
+ *   { action: 'SAVE_SESSION',      payload: { name } }              → { session }   (free: throws 'FREE_LIMIT_REACHED: …' at 50 saved)
  *   { action: 'RESTORE_SESSION',   payload: { id } }                → { ok }
  *   { action: 'DELETE_SESSION',    payload: { id, force? } }        → { ok }   (soft delete → trash)
  *   { action: 'RENAME_SESSION',    payload: { id, name } }          → { session }
@@ -32,6 +32,10 @@
  *   { action: 'LOCK_SESSION',      payload: { id } }                → { session }
  *   { action: 'UNLOCK_SESSION',    payload: { id } }                → { session }
  *
+ *   Entitlements (free vs Pro):
+ *   { action: 'GET_ENTITLEMENTS' }                                   → { entitlements: { pro }, limits: { freeSessionLimit } }
+ *   { action: 'SET_PRO',          payload: { pro } }                → { entitlements }   (dev/stub toggle)
+ *
  *   Cloud sync (paid, stubbed):
  *   { action: 'GET_SYNC_STATUS' }                                    → { status }
  *   { action: 'SET_SYNC_ENABLED', payload: { enabled, credentials? } } → { status }
@@ -39,6 +43,13 @@
  *
  * SEARCH_SESSIONS result item: { session, matchedTabs: Tab[], nameMatch: boolean }
  * Sync status shape: { enabled, state, lastSync, error } — see sync.js
+ *
+ * Free vs Pro (see entitlements.js / docs/TIERS.md):
+ *   - Timed autosave runs only for Pro; on free the alarm is never armed.
+ *   - Free is capped at 50 manually-saved sessions; SAVE_SESSION / DUPLICATE_SESSION
+ *     throw 'FREE_LIMIT_REACHED: …' at the cap (UI matches the prefix → upgrade prompt).
+ *   - Crash recovery (RECOVER_LAST), import, and trash are exempt — the safety
+ *     net always works regardless of plan.
  */
 
 import {
@@ -65,6 +76,7 @@ import {
 } from '../storage/storage.js';
 
 import * as sync from './sync.js';
+import { isPro, getEntitlements, setPro, FREE_SESSION_LIMIT } from './entitlements.js';
 
 // ─── URL filtering ────────────────────────────────────────────────────────────
 
@@ -168,6 +180,26 @@ async function pruneAutoSessions() {
   }
 }
 
+// ─── Free-tier limit ────────────────────────────────────────────────────────
+// Stable error prefix the UI matches on to show an upgrade prompt.
+const FREE_LIMIT_ERROR = 'FREE_LIMIT_REACHED';
+
+// Throws when a free user is at the manual-save cap. What does NOT count:
+//   - autosaves (Pro-only anyway)        - trashed sessions (already removed)
+//   - crash recovery + import            → those are recovery flows, exempt,
+//     so "never lose your tabs" holds regardless of plan.
+async function assertCanSaveManual() {
+  if (await isPro()) return;
+  const sessions = await getAllSessions();
+  const manualCount = Object.values(sessions).filter(s => !s.isAuto).length;
+  if (manualCount >= FREE_SESSION_LIMIT) {
+    throw new Error(
+      `${FREE_LIMIT_ERROR}: Free plan allows ${FREE_SESSION_LIMIT} saved sessions. ` +
+        'Delete some or upgrade to Pro.',
+    );
+  }
+}
+
 // ─── Search ───────────────────────────────────────────────────────────────────
 // Base matching lives in storage.searchSessions (single source of truth).
 // The engine only enriches each hit with the tabs that matched, so the UI can
@@ -219,13 +251,15 @@ let lastAutosaveFingerprint = '';
 async function scheduleAutosave() {
   const settings = await getSettings();
   await chrome.alarms.clear(ALARM_NAME);
-  if (settings.autosaveEnabled) {
+  // Timed autosave is a Pro feature — only arm the alarm for Pro users.
+  if (settings.autosaveEnabled && (await isPro())) {
     chrome.alarms.create(ALARM_NAME, { periodInMinutes: settings.autosaveInterval });
   }
 }
 
 chrome.alarms.onAlarm.addListener(async alarm => {
   if (alarm.name !== ALARM_NAME) return;
+  if (!(await isPro())) return; // belt-and-suspenders: never autosave on free
   const settings = await getSettings();
   if (!settings.autosaveEnabled) return;
 
@@ -255,6 +289,7 @@ async function handleMessage({ action, payload = {} }) {
   switch (action) {
 
     case 'SAVE_SESSION': {
+      await assertCanSaveManual();
       const session = await saveCurrentSession(payload.name ?? 'Unnamed session');
       return { session };
     }
@@ -281,6 +316,7 @@ async function handleMessage({ action, payload = {} }) {
     }
 
     case 'DUPLICATE_SESSION': {
+      await assertCanSaveManual();
       const source = await getSession(payload.id);
       if (!source) throw new Error(`Session ${payload.id} not found`);
       const now = Date.now();
@@ -407,6 +443,20 @@ async function handleMessage({ action, payload = {} }) {
     case 'GET_STORAGE_STATS': {
       const stats = await getStorageStats();
       return { stats };
+    }
+
+    // ── Entitlements (free vs Pro) ──
+
+    case 'GET_ENTITLEMENTS': {
+      const entitlements = await getEntitlements();
+      return { entitlements, limits: { freeSessionLimit: FREE_SESSION_LIMIT } };
+    }
+
+    case 'SET_PRO': {
+      // Dev/stub toggle — real licence activation lands later.
+      const entitlements = await setPro(payload.pro);
+      await scheduleAutosave(); // arm/disarm the autosave alarm for the new tier
+      return { entitlements };
     }
 
     // ── Cloud sync (paid) — engine owns the contract, transport is stubbed ──

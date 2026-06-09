@@ -18,6 +18,8 @@ All communication goes through `chrome.runtime.sendMessage`.
 
 ```js
 // Save the current tabs as a named session
+// FREE PLAN: throws an error starting with 'FREE_LIMIT_REACHED' once the user
+// has 50 saved sessions — catch it and show an upgrade/clean-up prompt.
 const { session } = await chrome.runtime.sendMessage({
   action: 'SAVE_SESSION',
   payload: { name: 'Work — Monday' }
@@ -101,6 +103,15 @@ await chrome.runtime.sendMessage({ action: 'UNLOCK_SESSION', payload: { id } });
 const { stats } = await chrome.runtime.sendMessage({ action: 'GET_STORAGE_STATS' });
 // One session's tab urls as plain text (newline-joined)
 const { text } = await chrome.runtime.sendMessage({ action: 'EXPORT_SESSION_TEXT', payload: { id } });
+
+// ── Entitlements (free vs Pro) — see docs/TIERS.md ──
+// On open: show "N / 50" counter + Upgrade button; lock Autosave when !pro.
+const { entitlements, limits } =
+  await chrome.runtime.sendMessage({ action: 'GET_ENTITLEMENTS' });
+// entitlements: { pro: boolean }   limits: { freeSessionLimit: 50 }
+
+// Dev/stub toggle (no billing yet) — flip Pro to test the paid UI:
+await chrome.runtime.sendMessage({ action: 'SET_PRO', payload: { pro: true } });
 
 // ── Cloud sync (paid) — transport is stubbed for now, contract is stable ──
 

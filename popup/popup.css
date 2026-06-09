@@ -1,0 +1,131 @@
+/* UI styles — owned by the UI developer. */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  width: 360px;
+  min-height: 200px;
+  background: #fff;
+  color: #1a1a1a;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+header h1 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+#sessions-list {
+  flex: 1;
+  padding: 8px;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.empty {
+  color: #888;
+  text-align: center;
+  padding: 24px;
+}
+
+.session-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+  background: #f7f7f7;
+}
+
+.session-card:hover {
+  background: #f0f0f0;
+}
+
+.session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.session-name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-meta {
+  font-size: 11px;
+  color: #888;
+}
+
+.session-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.session-actions button {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-restore {
+  background: #2563eb;
+  color: #fff;
+}
+
+.btn-restore:hover {
+  background: #1d4ed8;
+}
+
+.btn-delete {
+  background: #e5e5e5;
+  color: #555;
+}
+
+.btn-delete:hover {
+  background: #d4d4d4;
+}
+
+footer {
+  padding: 10px 16px;
+  border-top: 1px solid #e5e5e5;
+}
+
+#btn-save {
+  width: 100%;
+  padding: 8px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+#btn-save:hover {
+  background: #1d4ed8;
+}

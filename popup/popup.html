@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Session Vault</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <!--
+    UI — owned by the UI developer.
+
+    To talk to the Core Engine, use the message API:
+
+      const { sessions } = await chrome.runtime.sendMessage({ action: 'GET_SESSIONS' });
+
+      const { session } = await chrome.runtime.sendMessage({
+        action: 'SAVE_SESSION',
+        payload: { name: 'My session' }
+      });
+
+      await chrome.runtime.sendMessage({
+        action: 'RESTORE_SESSION',
+        payload: { id: session.id }
+      });
+
+      await chrome.runtime.sendMessage({
+        action: 'DELETE_SESSION',
+        payload: { id: session.id }
+      });
+
+      const { settings } = await chrome.runtime.sendMessage({ action: 'GET_SETTINGS' });
+
+      await chrome.runtime.sendMessage({
+        action: 'UPDATE_SETTINGS',
+        payload: { autosaveEnabled: true, autosaveInterval: 15 }
+      });
+  -->
+
+  <div id="app">
+    <header>
+      <h1>Session Vault</h1>
+    </header>
+
+    <main id="sessions-list">
+      <!-- session cards rendered here by popup.js -->
+    </main>
+
+    <footer>
+      <button id="btn-save">Save current session</button>
+    </footer>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

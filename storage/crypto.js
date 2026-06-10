@@ -19,7 +19,9 @@
 import { bytesToBase64, base64ToBytes } from './gzip.js';
 
 const VERSION = 'v1';
-const PBKDF2_ITERATIONS = 210_000; // OWASP-tier for PBKDF2-HMAC-SHA256
+// OWASP 2023 guidance for PBKDF2-HMAC-SHA256. Bound to envelope version `v1`;
+// to change it post-release, bump the version prefix so old blobs still decrypt.
+const PBKDF2_ITERATIONS = 600_000;
 const SALT_BYTES = 16;
 const IV_BYTES = 12;
 

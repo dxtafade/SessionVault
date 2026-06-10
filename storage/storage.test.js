@@ -214,6 +214,32 @@ describe('export / import', () => {
     const folders = await store.getFolders();
     expect(Object.keys(folders).sort()).toEqual([keep.id, 'f2'].sort());
   });
+
+  it('applies the whole vault in a single atomic write (sync-persist safety)', async () => {
+    const blob = {
+      sessions: { a: makeSession('a', 'A') },
+      folders: { f1: { id: 'f1', name: 'F', createdAt: 1, updatedAt: 1 } },
+      smartFolders: { sf1: { id: 'sf1', name: 'SF' } },
+      spaces: { sp1: { id: 'sp1', name: 'SP' } },
+    };
+
+    const realSet = chrome.storage.local.set;
+    let setCalls = 0;
+    chrome.storage.local.set = async (...args) => { setCalls++; return realSet(...args); };
+    try {
+      await store.importData(blob, 'replace');
+    } finally {
+      chrome.storage.local.set = realSet;
+    }
+
+    expect(setCalls).toBe(1);
+    // ...and everything still landed
+    expect(await store.getSession('a')).not.toBeNull();
+    expect(await store.getFolder('f1')).not.toBeNull();
+    const { smartFolders, spaces } = await chrome.storage.local.get(['smartFolders', 'spaces']);
+    expect(smartFolders.sf1).toBeDefined();
+    expect(spaces.sp1).toBeDefined();
+  });
 });
 
 // ─── Storage usage ──────────────────────────────────────────────────────────────

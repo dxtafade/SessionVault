@@ -343,49 +343,56 @@ export async function exportData() {
  * Merges an imported data blob into local storage.
  * mode:
  *   'merge'   — keeps existing data, adds/overwrites from import (default)
- *   'replace' — clears sessions/folders/smartFolders first, then imports
+ *   'replace' — clears sessions/folders/smartFolders/spaces first, then imports
  *
  * Folders, smart folders, and spaces are restored too when present, so a
  * backup never loses the user's organization. Returns
  * { imported: number, skipped: number } (session counts).
+ *
+ * The whole import is written in a SINGLE chrome.storage write so it applies
+ * atomically — no partial vault state if interrupted. This matters because the
+ * sync persist path (SYNC_NOW → importData(mergedVault, 'replace')) runs it on
+ * every sync.
  */
 export async function importData(blob, mode = 'merge') {
   if (!blob || typeof blob !== 'object') throw new Error('Invalid import file');
   if (!blob.sessions || typeof blob.sessions !== 'object')
     throw new Error('Import file has no sessions');
 
-  const incoming = blob.sessions;
-  const existing = mode === 'replace' ? {} : await getAllSessions();
+  // Read every base we may need up front, then build one patch to write once.
+  const replace = mode === 'replace';
+  const [sessionsBase, foldersBase, smartBase, spacesBase] = await Promise.all([
+    replace ? {} : getAllSessions(),
+    blob.folders && !replace ? _read('folders') : null,
+    blob.smartFolders && !replace ? _read('smartFolders') : null,
+    blob.spaces && !replace ? _read('spaces') : null,
+  ]);
 
+  const existing = { ...sessionsBase };
   let imported = 0;
   let skipped = 0;
 
-  for (const [id, session] of Object.entries(incoming)) {
+  for (const [id, session] of Object.entries(blob.sessions)) {
     if (!isValidSession(session)) { skipped++; continue; }
     existing[id] = session;
     imported++;
   }
 
-  await _write({ sessions: existing });
+  const patch = { sessions: existing };
 
-  if (blob.settings && mode === 'replace') {
-    await _write({ settings: blob.settings });
-  }
+  if (blob.settings && replace) patch.settings = blob.settings;
 
   if (blob.folders && typeof blob.folders === 'object') {
-    const base = mode === 'replace' ? {} : (await _read('folders')).folders ?? {};
-    await _write({ folders: { ...base, ...blob.folders } });
+    patch.folders = { ...(foldersBase?.folders ?? {}), ...blob.folders };
   }
-
   if (blob.smartFolders && typeof blob.smartFolders === 'object') {
-    const base = mode === 'replace' ? {} : (await _read('smartFolders')).smartFolders ?? {};
-    await _write({ smartFolders: { ...base, ...blob.smartFolders } });
+    patch.smartFolders = { ...(smartBase?.smartFolders ?? {}), ...blob.smartFolders };
+  }
+  if (blob.spaces && typeof blob.spaces === 'object') {
+    patch.spaces = { ...(spacesBase?.spaces ?? {}), ...blob.spaces };
   }
 
-  if (blob.spaces && typeof blob.spaces === 'object') {
-    const base = mode === 'replace' ? {} : (await _read('spaces')).spaces ?? {};
-    await _write({ spaces: { ...base, ...blob.spaces } });
-  }
+  await _write(patch); // single atomic write
 
   return { imported, skipped };
 }

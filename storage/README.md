@@ -10,7 +10,7 @@ call these functions — they never touch `chrome.storage` directly.
 - [`gzip.js`](gzip.js) — gzip + base64 helpers (shared by archive + file-transfer)
 - [`crypto.js`](crypto.js) — client-side encryption for sync (see [`docs/CRYPTO_CONTRACT.md`](../docs/CRYPTO_CONTRACT.md))
 - [`sync-support.js`](sync-support.js) — pure last-write-wins merge for multi-device sync (Core composes it)
-- Tests: `*.test.js` in this folder — run `npm test` (119 tests)
+- Tests: `*.test.js` in this folder — run `npm test` (120 tests)
 
 > **Storage owns these files only.** Wiring any of this into the message API
 > (`background/service-worker.js`) is the Core Engine's job.
@@ -149,7 +149,7 @@ Storage keys: `sessions`, `settings`, `trash`, `folders`, `smartFolders`, `space
 | Function | Returns | Notes |
 |---|---|---|
 | `exportData()` | `{ _exportedAt, _schemaVersion, sessions, settings, folders, smartFolders }` | Full vault incl. organization (tags ride on sessions) |
-| `importData(blob, mode = 'merge')` | `{ imported, skipped }` | `mode`: `'merge'` \| `'replace'`; restores folders + smartFolders too; skips malformed sessions |
+| `importData(blob, mode = 'merge')` | `{ imported, skipped }` | `mode`: `'merge'` \| `'replace'`; restores folders/smartFolders/spaces too; skips malformed sessions; **single atomic write** (safe on the sync-persist path) |
 | `exportSessionAsText(id)` | `string` | Tab URLs, newline-separated |
 
 ### Stats & maintenance

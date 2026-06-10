@@ -50,6 +50,10 @@ const DEFAULT_SETTINGS = {
 const TRASH_TTL_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// Storage health thresholds (percent of quota used).
+const QUOTA_WARNING_PERCENT = 75;
+const QUOTA_CRITICAL_PERCENT = 90;
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 async function _read(keys) {
@@ -57,7 +61,19 @@ async function _read(keys) {
 }
 
 async function _write(data) {
-  return chrome.storage.local.set(data);
+  try {
+    return await chrome.storage.local.set(data);
+  } catch (err) {
+    // Surface quota overflow with a clean, identifiable prefix so the engine/UI
+    // can prompt "storage full — archive or clear space" instead of a raw error.
+    // No data is lost: the failed write simply didn't apply.
+    if (/quota/i.test(err?.message ?? '')) {
+      throw new Error(
+        'QUOTA_EXCEEDED: storage is full — archive or remove sessions, or empty the trash',
+      );
+    }
+    throw err;
+  }
 }
 
 // ─── Schema migration ─────────────────────────────────────────────────────────
@@ -384,6 +400,41 @@ export async function getStorageUsage() {
   const used = await chrome.storage.local.getBytesInUse(null);
   const quota = chrome.storage.local.QUOTA_BYTES ?? 10_485_760; // 10 MB fallback
   return { used, quota, percent: Math.round((used / quota) * 100) };
+}
+
+/**
+ * Proactive quota health for the UI — warn the user before writes start
+ * failing, since a failed save would mean a lost session (the one thing we
+ * promise never happens).
+ *
+ * Returns { used, quota, percent, level, suggestions } where
+ *   level: 'ok' (<75%) | 'warning' (75–90%) | 'critical' (>=90%)
+ *   suggestions: concrete, data-driven actions to reclaim space.
+ */
+export async function getStorageHealth() {
+  const [usage, trash, archive] = await Promise.all([
+    getStorageUsage(),
+    getTrash(),
+    getArchive(),
+  ]);
+
+  let level = 'ok';
+  if (usage.percent >= QUOTA_CRITICAL_PERCENT) level = 'critical';
+  else if (usage.percent >= QUOTA_WARNING_PERCENT) level = 'warning';
+
+  const suggestions = [];
+  if (level !== 'ok') {
+    const trashCount = Object.keys(trash).length;
+    if (trashCount > 0) {
+      suggestions.push(`Empty the trash to free space (${trashCount} item${trashCount === 1 ? '' : 's'})`);
+    }
+    if (Object.keys(archive).length === 0) {
+      suggestions.push('Archive old sessions you rarely reopen');
+    }
+    suggestions.push('Export a backup, then remove sessions you no longer need');
+  }
+
+  return { ...usage, level, suggestions };
 }
 
 /**

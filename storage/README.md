@@ -10,7 +10,7 @@ call these functions — they never touch `chrome.storage` directly.
 - [`gzip.js`](gzip.js) — gzip + base64 helpers (shared by archive + file-transfer)
 - [`crypto.js`](crypto.js) — client-side encryption for sync (see [`docs/CRYPTO_CONTRACT.md`](../docs/CRYPTO_CONTRACT.md))
 - [`sync-support.js`](sync-support.js) — pure last-write-wins merge for multi-device sync (Core composes it)
-- Tests: `*.test.js` in this folder — run `npm test` (114 tests)
+- Tests: `*.test.js` in this folder — run `npm test` (119 tests)
 
 > **Storage owns these files only.** Wiring any of this into the message API
 > (`background/service-worker.js`) is the Core Engine's job.
@@ -156,8 +156,15 @@ Storage keys: `sessions`, `settings`, `trash`, `folders`, `smartFolders`, `space
 | Function | Returns |
 |---|---|
 | `getStorageUsage()` | `{ used, quota, percent }` |
-| `getStorageStats()` | `{ sessions: { total, auto, manual, locked }, totalTabs, trashCount, archivedCount, folderCount, usage }` |
+| `getStorageHealth()` | `{ used, quota, percent, level, suggestions }` — `level`: `ok`/`warning`(≥75%)/`critical`(≥90%); data-driven reclaim suggestions |
+| `getStorageStats()` | `{ sessions: { total, auto, manual, locked }, totalTabs, trashCount, archivedCount, folderCount, spaceCount, usage }` |
 | `migrateIfNeeded()` | `void` — stamp schema version (call on install/update) |
+
+**Quota guard:** every write goes through a guard that rethrows a chrome.storage
+quota overflow as an error prefixed `QUOTA_EXCEEDED:` (no data lost — the write
+just didn't apply), so the engine/UI can prompt the user to free space instead
+of showing a raw error. Pair with `getStorageHealth()` to warn *before* that
+happens. Simplest long-term fix is `"unlimitedStorage"` in the manifest (Core's call).
 
 ## `gzip.js` API
 

@@ -228,6 +228,60 @@ describe('getStorageUsage', () => {
   });
 });
 
+describe('getStorageHealth', () => {
+  it('is ok well under quota with no suggestions', async () => {
+    await store.saveSession(makeSession('a', 'A', [makeTab('https://x.com')]));
+    const health = await store.getStorageHealth();
+    expect(health.level).toBe('ok');
+    expect(health.suggestions).toEqual([]);
+  });
+
+  it('warns and suggests actions as quota fills', async () => {
+    // Shrink the quota so any saved data crosses the threshold.
+    chrome.storage.local.QUOTA_BYTES = 50;
+    await store.saveSession(makeSession('a', 'A', [makeTab('https://example.com/some/path')]));
+
+    const health = await store.getStorageHealth();
+    expect(['warning', 'critical']).toContain(health.level);
+    expect(health.suggestions.length).toBeGreaterThan(0);
+    expect(health.suggestions.some(s => /archive/i.test(s))).toBe(true);
+  });
+
+  it('suggests emptying the trash when it has items', async () => {
+    chrome.storage.local.QUOTA_BYTES = 50;
+    await store.saveSession(makeSession('a', 'A'));
+    await store.saveSession(makeSession('b', 'B'));
+    await store.trashSession('b');
+
+    const health = await store.getStorageHealth();
+    expect(health.suggestions.some(s => /trash/i.test(s))).toBe(true);
+  });
+});
+
+describe('quota guard (_write overflow)', () => {
+  it('rethrows quota errors with a clean QUOTA_EXCEEDED prefix', async () => {
+    const realSet = chrome.storage.local.set;
+    chrome.storage.local.set = async () => {
+      throw new Error('QUOTA_BYTES quota exceeded');
+    };
+    try {
+      await expect(store.saveSession(makeSession('a', 'A'))).rejects.toThrow(/^QUOTA_EXCEEDED/);
+    } finally {
+      chrome.storage.local.set = realSet;
+    }
+  });
+
+  it('lets non-quota errors through unchanged', async () => {
+    const realSet = chrome.storage.local.set;
+    chrome.storage.local.set = async () => { throw new Error('disk on fire'); };
+    try {
+      await expect(store.saveSession(makeSession('a', 'A'))).rejects.toThrow(/disk on fire/);
+    } finally {
+      chrome.storage.local.set = realSet;
+    }
+  });
+});
+
 describe('getStorageStats', () => {
   it('aggregates session, tab, and trash counts', async () => {
     await store.saveSession(

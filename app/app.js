@@ -431,6 +431,7 @@ function renderSettings() {
       <div class="modal-head">
         <span class="black" style="font-size:34px">SETTINGS</span>
         <span style="flex:1"></span>
+        <button class="actbtn" data-replay>↻ REPLAY INTRO</button>
         <button class="actbtn" data-done>DONE ↩</button>
       </div>
 
@@ -448,6 +449,7 @@ function renderSettings() {
   ov.hidden = false;
   ov.onclick = (e) => { if (e.target === ov) closeSettings(); };
   $('[data-done]', ov).onclick = closeSettings;
+  $('[data-replay]', ov).onclick = () => { closeSettings(); renderOnboarding(); };
   ov.querySelectorAll('[data-seg]').forEach((b) => b.onclick = () => { prefs[b.dataset.seg] = b.dataset.val; savePrefs(); applyPrefs(); renderSettings(); });
   ov.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = async () => {
     const key = b.dataset.toggle;
@@ -550,6 +552,89 @@ async function renderSync() {
 function renderSyncError(msg) { const ov = $('#overlay-sync'); if (!ov) return; const m = ov.querySelector('.modal'); const e = document.createElement('div'); e.className = 'sync-err mono'; e.textContent = msg; m.appendChild(e); }
 function closeSync() { syncOpen = false; const ov = $('#overlay-sync'); if (ov) ov.remove(); }
 
+// ── onboarding (first run; 3 steps, replayable from settings) ───────────────────
+const ONB_KEY = 'sv_app_onboarded';
+const ONB_STEPS = [
+  { title: 'A thousand tabs.\nOne vault.', body: 'SessionVault collapses your open tabs into tidy sessions — and brings them back in one click. Let your browser breathe.' },
+  { title: 'Order finds\nitself.', body: 'Tags, search and folders. Drag sessions around the desk and file them into shelves like cards on a board.' },
+  { title: 'Everywhere\nyou go.', body: 'Sessions sync, end-to-end encrypted, across your devices. Home, work, on the road — your vault is always at hand.' },
+];
+const ONB_TAGS = [
+  { label: 'work', c: '#2D9D78', x: -120, y: -64, r: -10 },
+  { label: 'research', c: '#3A86C8', x: 122, y: -48, r: 8 },
+  { label: 'personal', c: '#E8744F', x: -104, y: 66, r: 6 },
+  { label: 'reading', c: '#7B6CF6', x: 112, y: 70, r: -7 },
+];
+const CARD_STRIPS = ['#2D9D78', '#E8744F', '#7B6CF6', '#D9A431', '#3A86C8'];
+const DEV_GLYPHS = {
+  laptop: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M2 20h20"/></svg>',
+  desktop: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M9 21h6M12 17v4"/></svg>',
+  phone: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>',
+};
+const CHECK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg>';
+
+function renderOnboarding() {
+  let ov = $('#overlay-onb');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'overlay-onb'; ov.className = 'modal-center'; app.appendChild(ov); }
+  ov.innerHTML = `
+    <div class="modal onb-modal" style="transform:rotate(-.4deg)">
+      <div class="onb-wordmark">SESSIONVAULT</div>
+      <div class="onb-stage" id="onb-stage">
+        ${[0, 1, 2, 3, 4].map((i) => `
+          <div class="onb-card" data-i="${i}">
+            <div class="cstrip" style="background:${CARD_STRIPS[i]}"></div>
+            <div class="clines"><div class="onb-line a" style="background:${CARD_STRIPS[i]}"></div><div class="onb-line"></div><div class="onb-line" style="width:55%"></div></div>
+          </div>`).join('')}
+        <div class="onb-layer" id="onb-tags"></div>
+        <div class="onb-layer" id="onb-devices" style="display:flex;align-items:flex-end;justify-content:center;gap:26px;padding-bottom:6px"></div>
+      </div>
+      <h2 class="onb-title" id="onb-title"></h2>
+      <p class="onb-body" id="onb-body"></p>
+      <div class="onb-foot">
+        <button class="onb-skip tactile" id="onb-skip">Skip</button>
+        <div class="onb-dots" id="onb-dots">${ONB_STEPS.map((_, i) => `<button class="onb-dot" data-step="${i}" aria-label="step ${i + 1}"></button>`).join('')}</div>
+        <button class="onb-next tactile" id="onb-next"></button>
+      </div>
+    </div>`;
+  ov.hidden = false;
+
+  let step = 0;
+  const cards = [...ov.querySelectorAll('.onb-card')];
+  const applyStep = (n) => {
+    step = n;
+    cards.forEach((el, i) => {
+      const d = i - 2;
+      if (step === 0) {
+        el.style.transform = `translate(${d * 64}px, ${Math.abs(d) * 14 - 22}px) rotate(${d * 9}deg)`;
+        el.style.opacity = '1';
+      } else {
+        el.style.transform = `translateY(${d * 9}px) scale(${1 - Math.abs(d) * 0.06})`;
+        el.style.opacity = i === 2 ? '1' : '.5';
+      }
+    });
+    $('#onb-tags', ov).innerHTML = step === 1
+      ? ONB_TAGS.map((tg, i) => `<span class="onb-tag" style="color:${tg.c};border-color:color-mix(in srgb, ${tg.c} 45%, transparent);transform:translate(-50%,-50%) translate(${tg.x}px,${tg.y}px) rotate(${tg.r}deg);animation-delay:${150 + i * 90}ms"><span class="d" style="background:${tg.c}"></span>${tg.label}</span>`).join('')
+      : '';
+    $('#onb-devices', ov).innerHTML = step === 2
+      ? Object.keys(DEV_GLYPHS).map((k, i) => `<div class="onb-dev" style="animation-delay:${i * 110}ms"><div class="glyph">${DEV_GLYPHS[k]}</div><span style="color:var(--sub)">${CHECK}</span></div>`).join('')
+      : '';
+    $('#onb-title', ov).textContent = ONB_STEPS[step].title;
+    $('#onb-body', ov).textContent = ONB_STEPS[step].body;
+    ov.querySelectorAll('.onb-dot').forEach((dt, i) => dt.classList.toggle('on', i === step));
+    $('#onb-next', ov).innerHTML = (step < 2 ? 'Next' : 'Get started') + ' →';
+  };
+
+  applyStep(0);
+  $('#onb-skip', ov).onclick = finishOnboarding;
+  $('#onb-next', ov).onclick = () => { step < 2 ? applyStep(step + 1) : finishOnboarding(); };
+  ov.querySelectorAll('.onb-dot').forEach((dt) => dt.onclick = () => applyStep(Number(dt.dataset.step)));
+}
+
+function finishOnboarding() {
+  try { localStorage.setItem(ONB_KEY, '1'); } catch {}
+  const ov = $('#overlay-onb'); if (ov) ov.remove();
+}
+
 // ── global keys ───────────────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
@@ -557,6 +642,7 @@ document.addEventListener('keydown', (e) => {
     if ($('#overlay-trash')) return closeTrash();
     if ($('#overlay-settings')) return closeSettings();
     if ($('#overlay-sync')) return closeSync();
+    if ($('#overlay-onb')) return finishOnboarding();
   }
   if ((e.key === '/' || (e.key === 'k' && (e.metaKey || e.ctrlKey))) && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) {
     e.preventDefault(); const s = $('#search'); if (s) s.focus();
@@ -568,4 +654,7 @@ document.addEventListener('keydown', (e) => {
   applyPrefs();
   await loadData();
   render();
+  let onboarded = '1';
+  try { onboarded = localStorage.getItem(ONB_KEY); } catch {}
+  if (!onboarded) renderOnboarding();
 })();

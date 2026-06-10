@@ -185,10 +185,12 @@ await chrome.runtime.sendMessage({ action: 'SET_PRO', payload: { pro: true } });
 // status: { enabled, state: 'idle'|'syncing'|'error'|'disabled', lastSync, error }
 const { status } = await chrome.runtime.sendMessage({ action: 'GET_SYNC_STATUS' });
 
+// enabled:true signs in to the sync backend (Supabase) and stores the session.
 await chrome.runtime.sendMessage({
   action: 'SET_SYNC_ENABLED',
-  payload: { enabled: true, credentials: { /* TBD */ } }
+  payload: { enabled: true, credentials: { email, password } }
 });
+// status now includes { email } (never tokens). enabled:false signs out.
 
 // Syncs the FULL vault (sessions + folders + smart folders + spaces), merged
 // last-write-wins across devices. passphrase = E2E key, per-sync, never persisted.

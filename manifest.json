@@ -9,7 +9,7 @@
     "storage",
     "alarms"
   ],
-  "host_permissions": [],
+  "host_permissions": ["https://rbsdtmjhhstqhqgddltu.supabase.co/*"],
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"

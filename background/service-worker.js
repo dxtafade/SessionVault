@@ -83,7 +83,7 @@
  *
  *   Cloud sync (paid, stubbed):
  *   { action: 'GET_SYNC_STATUS' }                                    → { status }
- *   { action: 'SET_SYNC_ENABLED', payload: { enabled, credentials? } } → { status }
+ *   { action: 'SET_SYNC_ENABLED', payload: { enabled, credentials?: { email, password } } } → { status }   (enabled:true signs in)
  *   { action: 'SYNC_NOW',         payload: { passphrase? } }        → { status }   (syncs full vault; passphrase = E2E key, never persisted)
  *   { action: 'ASSESS_PASSPHRASE', payload: { passphrase } }        → { assessment }  ({ score, label, acceptable, warnings })
  *

@@ -5,11 +5,14 @@
  * against; the actual network/crypto implementation lands later.
  *
  * Design rules:
- *   - Sync NEVER talks to chrome.storage directly. It receives sessions from
- *     the engine and returns sessions to merge back. Storage stays the single
- *     source of truth on disk.
- *   - All payloads are encrypted client-side before leaving the device
- *     (encrypted cloud sync is the paid promise). Encryption is stubbed here.
+ *   - Sync NEVER talks to chrome.storage directly. It receives the full vault
+ *     from the engine and returns the merged vault to persist back. Storage
+ *     stays the single source of truth on disk.
+ *   - The whole vault (sessions + folders + smartFolders + spaces) is synced so
+ *     organization travels between devices; merge is last-write-wins per record
+ *     via storage's mergeVault().
+ *   - The vault is encrypted client-side before leaving the device
+ *     (encryptBlob/decryptBlob from storage/crypto.js).
  *   - Every method is safe to call when sync is disabled — it resolves to a
  *     no-op status rather than throwing.
  *
@@ -23,6 +26,7 @@
  */
 
 import { encryptBlob, decryptBlob } from '../storage/crypto.js';
+import { mergeVault } from '../storage/sync-support.js';
 
 const SYNC_STATE_KEY = 'syncState';
 
@@ -77,47 +81,38 @@ export async function disable() {
 }
 
 /**
- * Push local sessions up and merge remote sessions down.
+ * Push the local vault up, pull the remote vault, merge, and return the result.
  *
- * @param {Object} localSessions  { [id]: Session } from storage
+ * @param {Object} localVault  full vault — { sessions, folders, smartFolders,
+ *        spaces, ... }. The engine builds this from storage.exportData().
  * @param {Object} [opts]
  * @param {string} [opts.passphrase]  E2E passphrase — supplied per-sync by the
  *        UI, never persisted (keeping it off disk is the point of E2E crypto).
- * @returns {Promise<{ status, merged: Object }>}  merged = sessions to persist
+ * @returns {Promise<{ status, merged: Object }>}  merged = vault to persist.
+ *        When sync is disabled or errors, merged === localVault (no-op) and the
+ *        engine skips the write.
  *
- * Merge policy: last-write-wins by updatedAt (see mergeSessions).
+ * Merge policy: last-write-wins per record by updatedAt (storage's mergeVault).
  */
-export async function sync(localSessions, { passphrase } = {}) {
+export async function sync(localVault, { passphrase } = {}) {
   const status = await getStatus();
   if (!status.enabled) {
-    return { status, merged: localSessions };
+    return { status, merged: localVault };
   }
 
   await setStatus({ state: 'syncing', error: null });
   try {
-    const blob = await encryptBlob({ sessions: localSessions }, passphrase);
+    const blob = await encryptBlob(localVault, passphrase);
     await pushRemote(blob);
 
     const remoteBlob = await pullRemote();
-    const remote = remoteBlob ? await decryptBlob(remoteBlob, passphrase) : { sessions: {} };
-    const merged = mergeSessions(localSessions, remote.sessions);
+    const remoteVault = remoteBlob ? await decryptBlob(remoteBlob, passphrase) : {};
+    const merged = mergeVault(localVault, remoteVault);
 
     const next = await setStatus({ state: 'idle', lastSync: Date.now() });
     return { status: next, merged };
   } catch (err) {
     const next = await setStatus({ state: 'error', error: err.message });
-    return { status: next, merged: localSessions };
+    return { status: next, merged: localVault };
   }
-}
-
-/** Last-write-wins merge by updatedAt. Pure function — safe to unit test. */
-export function mergeSessions(local, remote) {
-  const merged = { ...local };
-  for (const [id, remoteSession] of Object.entries(remote)) {
-    const localSession = merged[id];
-    if (!localSession || remoteSession.updatedAt > localSession.updatedAt) {
-      merged[id] = remoteSession;
-    }
-  }
-  return merged;
 }

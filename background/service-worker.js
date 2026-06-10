@@ -83,7 +83,8 @@
  *   Cloud sync (paid, stubbed):
  *   { action: 'GET_SYNC_STATUS' }                                    → { status }
  *   { action: 'SET_SYNC_ENABLED', payload: { enabled, credentials? } } → { status }
- *   { action: 'SYNC_NOW',         payload: { passphrase? } }        → { status }   (passphrase = E2E key, never persisted)
+ *   { action: 'SYNC_NOW',         payload: { passphrase? } }        → { status }   (syncs full vault; passphrase = E2E key, never persisted)
+ *   { action: 'ASSESS_PASSPHRASE', payload: { passphrase } }        → { assessment }  ({ score, label, acceptable, warnings })
  *
  * SEARCH_SESSIONS result item: { session, matchedTabs: Tab[], nameMatch: boolean }
  * Sync status shape: { enabled, state, lastSync, error } — see sync.js
@@ -161,6 +162,7 @@ import {
 } from '../storage/spaces.js';
 
 import * as sync from './sync.js';
+import { assessPassphrase } from '../storage/crypto.js';
 import { isPro, getEntitlements, setPro, FREE_SESSION_LIMIT } from './entitlements.js';
 
 // ─── URL filtering ────────────────────────────────────────────────────────────
@@ -774,13 +776,21 @@ async function handleMessage({ action, payload = {} }) {
     }
 
     case 'SYNC_NOW': {
-      const localSessions = await getAllSessions();
-      const { status, merged } = await sync.sync(localSessions, { passphrase: payload.passphrase });
-      // Persist anything the merge pulled down
-      for (const session of Object.values(merged)) {
-        await saveSession(session);
+      // Sync the FULL vault (sessions + folders + smartFolders + spaces) so
+      // organization travels between devices, not just sessions.
+      const localVault = await exportData();
+      const { status, merged } = await sync.sync(localVault, { passphrase: payload.passphrase });
+      // Persist the merged vault only when sync actually ran (enabled + no error);
+      // on disabled/error, merged === localVault and we skip the rewrite.
+      if (status.enabled && !status.error) {
+        await importData(merged, 'replace');
       }
       return { status };
+    }
+
+    case 'ASSESS_PASSPHRASE': {
+      // Pure strength check for the UI sync-setup indicator. Ungated.
+      return { assessment: assessPassphrase(payload.passphrase) };
     }
 
     default:

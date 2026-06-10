@@ -175,8 +175,13 @@ await chrome.runtime.sendMessage({
   payload: { enabled: true, credentials: { /* TBD */ } }
 });
 
-// passphrase = end-to-end key, supplied per-sync, never persisted. See docs/CRYPTO_CONTRACT.md
+// Syncs the FULL vault (sessions + folders + smart folders + spaces), merged
+// last-write-wins across devices. passphrase = E2E key, per-sync, never persisted.
 await chrome.runtime.sendMessage({ action: 'SYNC_NOW', payload: { passphrase } });
+
+// Password-strength indicator for the sync-setup UI (pure, ungated):
+// → { score: 0-4, label: 'weak'|…, acceptable: boolean, warnings: string[] }
+const { assessment } = await chrome.runtime.sendMessage({ action: 'ASSESS_PASSPHRASE', payload: { passphrase } });
 ```
 
 ## Data shapes

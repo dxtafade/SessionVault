@@ -7,6 +7,7 @@
  * Message API (chrome.runtime.sendMessage / popup → engine):
  *   { action: 'SAVE_SESSION',      payload: { name } }              → { session }   (free: throws 'FREE_LIMIT_REACHED: …' at 50 saved)
  *   { action: 'RESTORE_SESSION',   payload: { id } }                → { ok }
+ *   { action: 'RESTORE_TAB',       payload: { url } }               → { ok }   (opens one tab)
  *   { action: 'DELETE_SESSION',    payload: { id, force? } }        → { ok }   (soft delete → trash)
  *   { action: 'RENAME_SESSION',    payload: { id, name } }          → { session }
  *   { action: 'DUPLICATE_SESSION', payload: { id, name? } }         → { session }
@@ -393,6 +394,13 @@ async function handleMessage({ action, payload = {} }) {
 
     case 'RESTORE_SESSION': {
       await restoreSession(payload.id);
+      return { ok: true };
+    }
+
+    case 'RESTORE_TAB': {
+      // Open a single saved tab in a new tab (used by the deal-out card view).
+      if (!payload.url) throw new Error('RESTORE_TAB needs a url');
+      await chrome.tabs.create({ url: payload.url });
       return { ok: true };
     }
 
@@ -814,3 +822,19 @@ async function bootstrap() {
 
 chrome.runtime.onInstalled.addListener(bootstrap);
 chrome.runtime.onStartup.addListener(bootstrap);
+
+// ─── Toolbar click → open the full-page app ─────────────────────────────────────
+// The action has no default_popup, so clicking the toolbar icon fires this.
+// We open (or focus) the full-page experience instead of a small popup.
+
+const APP_URL = chrome.runtime.getURL('app/index.html');
+
+chrome.action.onClicked.addListener(async () => {
+  const existing = await chrome.tabs.query({ url: APP_URL });
+  if (existing.length > 0) {
+    await chrome.tabs.update(existing[0].id, { active: true });
+    await chrome.windows.update(existing[0].windowId, { focused: true });
+  } else {
+    await chrome.tabs.create({ url: APP_URL });
+  }
+});

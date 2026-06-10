@@ -10,7 +10,22 @@ Browser extension that saves, restores, and syncs your tab sessions.
 |---|---|
 | **Core Engine** | `background/service-worker.js` |
 | **Storage** | `storage/storage.js` |
-| **UI** | `popup/popup.html`, `popup/popup.js`, `popup/popup.css` |
+| **UI** | `app/*` (full-page "Flip Desk"), `popup/*` (legacy popup) |
+
+## Full-page UI — "The Flip Desk"
+
+Clicking the toolbar icon opens a **full page** (`app/index.html`), not a popup:
+the manifest `action` has no `default_popup`, so the service worker's
+`chrome.action.onClicked` handler opens/focuses the app tab.
+
+- `app/api.js` — adapter to the Core Engine (real `sendMessage` + a mock backend
+  for previewing the page without the extension loaded).
+- `app/app.js` / `app/app.css` — the Flip Desk: folder-tab rail, draggable
+  session "stacks", click-to-deal-out tab cards, bin, search, settings.
+- Folders = shelves (tabs across the top). Save/restore/delete/share/trash and
+  settings are all wired to the message API below.
+
+Preview it standalone (mock mode): `python3 -m http.server -d app 8123`.
 
 ## Message API (UI → Core Engine)
 

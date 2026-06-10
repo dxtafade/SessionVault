@@ -10,7 +10,7 @@ call these functions — they never touch `chrome.storage` directly.
 - [`gzip.js`](gzip.js) — gzip + base64 helpers (shared by archive + file-transfer)
 - [`crypto.js`](crypto.js) — client-side encryption for sync (see [`docs/CRYPTO_CONTRACT.md`](../docs/CRYPTO_CONTRACT.md))
 - [`sync-support.js`](sync-support.js) — pure last-write-wins merge for multi-device sync (Core composes it)
-- Tests: `*.test.js` in this folder — run `npm test` (120 tests)
+- Tests: `*.test.js` in this folder — run `npm test` (125 tests)
 
 > **Storage owns these files only.** Wiring any of this into the message API
 > (`background/service-worker.js`) is the Core Engine's job.

@@ -382,14 +382,17 @@ export async function importData(blob, mode = 'merge') {
 
   if (blob.settings && replace) patch.settings = blob.settings;
 
+  // Organization collections are validated too — a malformed or corrupt backup
+  // file must not inject garbage that breaks the folder/smart-folder engines.
+  // Bad entries are dropped, not written.
   if (blob.folders && typeof blob.folders === 'object') {
-    patch.folders = { ...(foldersBase?.folders ?? {}), ...blob.folders };
+    patch.folders = { ...(foldersBase?.folders ?? {}), ..._pickValid(blob.folders, isValidFolder) };
   }
   if (blob.smartFolders && typeof blob.smartFolders === 'object') {
-    patch.smartFolders = { ...(smartBase?.smartFolders ?? {}), ...blob.smartFolders };
+    patch.smartFolders = { ...(smartBase?.smartFolders ?? {}), ..._pickValid(blob.smartFolders, isValidSmartFolder) };
   }
   if (blob.spaces && typeof blob.spaces === 'object') {
-    patch.spaces = { ...(spacesBase?.spaces ?? {}), ...blob.spaces };
+    patch.spaces = { ...(spacesBase?.spaces ?? {}), ..._pickValid(blob.spaces, isValidSpace) };
   }
 
   await _write(patch); // single atomic write
@@ -700,4 +703,32 @@ function isValidSession(s) {
     typeof s.createdAt === 'number' &&
     Array.isArray(s.tabs)
   );
+}
+
+function isValidFolder(f) {
+  return f && typeof f.id === 'string' && typeof f.name === 'string';
+}
+
+function isValidSpace(s) {
+  return s && typeof s.id === 'string' && typeof s.name === 'string';
+}
+
+function isValidSmartFolder(sf) {
+  return (
+    sf &&
+    typeof sf.id === 'string' &&
+    typeof sf.name === 'string' &&
+    sf.rules && typeof sf.rules === 'object' &&
+    (sf.rules.match === 'all' || sf.rules.match === 'any') &&
+    Array.isArray(sf.rules.conditions)
+  );
+}
+
+/** Returns a new map keeping only the entries that pass `validate`. */
+function _pickValid(map, validate) {
+  const out = {};
+  for (const [id, v] of Object.entries(map ?? {})) {
+    if (validate(v)) out[id] = v;
+  }
+  return out;
 }

@@ -54,6 +54,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const QUOTA_WARNING_PERCENT = 75;
 const QUOTA_CRITICAL_PERCENT = 90;
 
+// UI colors are interpolated into inline styles by the UI, so only accept a
+// plain hex color on write (defense-in-depth). Anything else becomes null.
+const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+export function sanitizeColor(color) {
+  return typeof color === 'string' && HEX_COLOR_RE.test(color.trim()) ? color.trim() : null;
+}
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 async function _read(keys) {
@@ -514,7 +521,7 @@ export async function getFolder(id) {
 export async function createFolder(name, { color = null } = {}) {
   const folders = await getFolders();
   const now = Date.now();
-  const folder = { id: _folderId(), name, color, createdAt: now, updatedAt: now };
+  const folder = { id: _folderId(), name, color: sanitizeColor(color), createdAt: now, updatedAt: now };
   folders[folder.id] = folder;
   await _write({ folders });
   return folder;

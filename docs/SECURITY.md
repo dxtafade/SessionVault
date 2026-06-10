@@ -22,36 +22,39 @@ are addressed. Findings are grouped by owner so each dev fixes their own area.
 - **Import:** `importData` validates sessions and organization (folders / smart
   folders / spaces); a corrupt or hostile backup can't break the vault.
 
-## Fixed in this review (Storage)
+## Fixed in this review
 
-- PBKDF2 iterations **210k → 600k** (OWASP 2023). Done now because pre-release
-  means no real vaults exist yet (no migration). Bound to envelope version `v1`;
-  any future change bumps the version prefix so old blobs still decrypt.
-  (commit `a712d35`)
+A one-time, owner-approved pass applied the actionable findings across all areas
+(commit history `a712d35` → latest):
 
-## Findings — Core Engine (`background/`) · owner: Dexter
+- **Storage:** PBKDF2 **210k → 600k** (OWASP 2023; pre-release so no migration;
+  bound to envelope `v1`, future changes bump the version).
+- **Storage:** `sanitizeColor()` — folder/space/smart-folder colors are now
+  validated to a hex format on write (createFolder/createSpace/createSmartFolder
+  and their updates), neutralizing the inline-style injection vector at the source.
+- **Core (`background/`):** `RESTORE_TAB` and `restoreSession` now only open
+  `http(s)` URLs (`isSafeRestoreUrl`), so an imported backup can't auto-open
+  `javascript:`/`data:`/`file:` URLs.
+- **Core:** dropped the unused `"sessions"` permission from the manifest (least-privilege).
+- **UI:** deleted dead `popup/*` (UI lives in `app/`) — less confusion, smaller surface.
+- **Supabase:** "Confirm email" turned **ON** (verified — the backend now rejects
+  the non-deliverable test domain it previously accepted).
 
-| Sev | Issue | Recommendation |
-|---|---|---|
-| 🟡 Low-Med | `RESTORE_TAB` / `restoreSession` open a saved URL with **no scheme filter**. A malicious *imported* backup could carry `javascript:` / `data:` URLs. Chrome blocks `javascript:` in `tabs.create`, but this is defense-in-depth. | Filter restore URLs to an `http(s)` allowlist (reuse `isRestoreable`) before `chrome.tabs.create`. |
-| 🟢 Low | Auth tokens (`access` + `refresh`) are stored **plaintext** in `chrome.storage.local`. Extension-isolated, but the refresh token is long-lived. | Acceptable for MVP; consider at-rest encryption or a shorter TTL later. |
-| 🟢 Low | `"sessions"` permission in the manifest appears unused. | Drop it for least-privilege if truly unused. |
-| 🟠 **Release-blocker** | **"Confirm email" is OFF in Supabase** (disabled for dev). | **Turn it back ON before release** — otherwise anyone can register accounts against other people's emails. |
+## Remaining findings
 
-## Findings — UI (`app/`) · owner: Lucik
-
-| Sev | Issue | Recommendation |
-|---|---|---|
-| 🟢 Low | Folder color is interpolated into an inline `style` (`background:${esc(color)}`). `esc()` prevents attribute breakout but doesn't validate CSS. | Validate the color format (`#rrggbb`) at creation — defense-in-depth. |
-| ℹ️ Info | `popup/*` is now dead code (UI moved to `app/`). | Delete it to avoid confusion and reduce attack surface. |
+| Sev | Area / owner | Issue | Recommendation |
+|---|---|---|---|
+| 🟢 Low | Core · Dexter | Auth tokens (`access` + `refresh`) stored plaintext in `chrome.storage.local`. Extension-isolated, but the refresh token is long-lived. | Acceptable for MVP; consider at-rest encryption or shorter TTL later. |
+| 🟡 Med | Backend · team | With "Confirm email" ON, the **default Supabase email sender is rate-limited** (~a few/hour) — confirmation emails may not deliver at launch volume. | Configure custom SMTP (Resend/SendGrid) before a real launch. |
 
 ## Non-code release checklist
 
-- [ ] **Revoke** the `sb_secret_…` key that was exposed in chat (Settings → API keys → Revoke).
-- [ ] **Turn ON "Confirm email"** in Supabase Auth for production.
-- [ ] **Privacy policy** for the Chrome Web Store listing — the extension reads
-      *all* tabs (sensitive); state that vault data is end-to-end encrypted.
-- [ ] **Real icons** (currently missing; blocked unpacked load earlier).
+- [x] **Revoke** the `sb_secret_…` key that was exposed in chat. (done)
+- [x] **Turn ON "Confirm email"** in Supabase Auth. (done — verified)
+- [x] **Privacy policy** drafted → [`PRIVACY.md`](PRIVACY.md) (review + add contact/legal before publishing).
+- [ ] **Custom SMTP** in Supabase so confirmation emails actually deliver at scale.
+- [ ] **Real icons** (currently missing) — Lucik.
+- [ ] Final once-over of `docs/PRIVACY.md` wording before the store listing.
 
 ## Scope note
 

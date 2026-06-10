@@ -10,7 +10,7 @@
  * Space { id, name, color?, icon?, createdAt, updatedAt }
  */
 
-import { getAllSessions, getFolders } from './storage.js';
+import { getAllSessions, getFolders, sanitizeColor } from './storage.js';
 
 const KEY = 'spaces';
 
@@ -33,7 +33,7 @@ export async function getSpace(id) {
 export async function createSpace(name, { color = null, icon = null } = {}) {
   const all = await getSpaces();
   const now = Date.now();
-  const space = { id: _id(), name, color, icon, createdAt: now, updatedAt: now };
+  const space = { id: _id(), name, color: sanitizeColor(color), icon, createdAt: now, updatedAt: now };
   all[space.id] = space;
   await chrome.storage.local.set({ [KEY]: all });
   return space;
@@ -42,7 +42,9 @@ export async function createSpace(name, { color = null, icon = null } = {}) {
 export async function updateSpace(id, partial = {}) {
   const all = await getSpaces();
   if (!all[id]) throw new Error(`Space ${id} not found`);
-  all[id] = { ...all[id], ...partial, id, updatedAt: Date.now() };
+  const clean = { ...partial };
+  if ('color' in clean) clean.color = sanitizeColor(clean.color);
+  all[id] = { ...all[id], ...clean, id, updatedAt: Date.now() };
   await chrome.storage.local.set({ [KEY]: all });
   return all[id];
 }

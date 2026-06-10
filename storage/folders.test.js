@@ -23,6 +23,13 @@ describe('folders', () => {
     expect((await store.getFolder(f.id)).name).toBe('Work 2');
   });
 
+  it('sanitizes folder color — keeps hex, drops anything else', async () => {
+    expect((await store.createFolder('A', { color: '#3af' })).color).toBe('#3af');
+    expect((await store.createFolder('B', { color: '#2D9D78' })).color).toBe('#2D9D78');
+    expect((await store.createFolder('C', { color: 'red; background:url(x)' })).color).toBeNull();
+    expect((await store.createFolder('D', { color: '<script>' })).color).toBeNull();
+  });
+
   it('assigns a session to a folder and lists by folder', async () => {
     await store.saveSession(makeSession('a', 'A'));
     await store.saveSession(makeSession('b', 'B'));

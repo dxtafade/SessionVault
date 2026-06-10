@@ -10,7 +10,7 @@ Browser extension that saves, restores, and syncs your tab sessions.
 |---|---|
 | **Core Engine** | `background/service-worker.js` |
 | **Storage** | `storage/storage.js` |
-| **UI** | `app/*` (full-page "Flip Desk"), `popup/*` (legacy popup) |
+| **UI** | `app/*` (full-page "Flip Desk") |
 
 ## Full-page UI — "The Flip Desk"
 

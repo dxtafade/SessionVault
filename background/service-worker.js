@@ -175,6 +175,13 @@ function isRestoreable(url) {
   return !SKIP_SCHEMES.some(s => url.startsWith(s));
 }
 
+// Tabs are only ever re-opened over http(s). A captured or (especially) an
+// imported session could otherwise carry javascript:/data:/file: URLs that
+// must never be auto-opened on restore. Defense-in-depth alongside isRestoreable.
+function isSafeRestoreUrl(url) {
+  return typeof url === 'string' && /^https?:\/\//i.test(url);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function generateId() {
@@ -234,9 +241,14 @@ async function restoreSession(id) {
   const session = await getSession(id);
   if (!session) throw new Error(`Session ${id} not found`);
 
+  // Only re-open http(s) tabs (drops any javascript:/data:/file: that slipped
+  // in via import). Nothing safe to open → no-op.
+  const safeTabs = session.tabs.filter(t => isSafeRestoreUrl(t.url));
+  if (safeTabs.length === 0) return;
+
   // Group by windowIndex, preserving original window order
   const byWindow = new Map();
-  for (const tab of session.tabs) {
+  for (const tab of safeTabs) {
     const wi = tab.windowIndex ?? 0;
     if (!byWindow.has(wi)) byWindow.set(wi, []);
     byWindow.get(wi).push(tab);
@@ -400,6 +412,7 @@ async function handleMessage({ action, payload = {} }) {
     case 'RESTORE_TAB': {
       // Open a single saved tab in a new tab (used by the deal-out card view).
       if (!payload.url) throw new Error('RESTORE_TAB needs a url');
+      if (!isSafeRestoreUrl(payload.url)) throw new Error('Refusing to open a non-http(s) URL');
       await chrome.tabs.create({ url: payload.url });
       return { ok: true };
     }

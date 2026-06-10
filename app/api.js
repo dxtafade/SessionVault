@@ -81,6 +81,18 @@ function load() {
 function save(s) { try { localStorage.setItem(MOCK_KEY, JSON.stringify(s)); } catch (e) {} }
 const genId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+// Mirrors storage/crypto.js assessPassphrase so the preview indicator matches.
+function mockAssess(passphrase) {
+  const pass = String(passphrase ?? ''); const len = pass.length;
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((re) => re.test(pass)).length;
+  let score = 0;
+  if (len >= 8) score++; if (len >= 12) score++; if (classes >= 2) score++; if (classes >= 3 && len >= 10) score++;
+  const warnings = [];
+  if (len < 8) warnings.push('Use at least 8 characters');
+  if (classes < 2) warnings.push('Mix letters, numbers, and symbols');
+  return { score, label: ['very weak', 'weak', 'fair', 'good', 'strong'][score], acceptable: score >= 2, warnings };
+}
+
 async function sendMock(action, payload = {}) {
   const db = load();
   const now = Date.now();
@@ -129,6 +141,20 @@ async function sendMock(action, payload = {}) {
       const s = db.sessions[payload.id];
       return { text: s ? s.tabs.map((t) => t.url).join('\n') : '' };
     }
+    case 'GET_SYNC_STATUS': return { status: db.sync || { enabled: false, state: 'disabled', lastSync: null, error: null, email: null } };
+    case 'SET_SYNC_ENABLED': {
+      if (payload.enabled) {
+        const email = payload.credentials?.email || 'you@example.com';
+        db.sync = { enabled: true, state: 'idle', lastSync: null, error: null, email };
+      } else { db.sync = { enabled: false, state: 'disabled', lastSync: null, error: null, email: null }; }
+      save(db); return { status: db.sync };
+    }
+    case 'SYNC_NOW': {
+      if (!db.sync?.enabled) return { status: db.sync };
+      if (!payload.passphrase) { db.sync = { ...db.sync, state: 'error', error: 'Passphrase required for sync' }; save(db); return { status: db.sync }; }
+      db.sync = { ...db.sync, state: 'idle', lastSync: now, error: null }; save(db); return { status: db.sync };
+    }
+    case 'ASSESS_PASSPHRASE': return { assessment: mockAssess(payload.passphrase) };
     default: throw new Error(`Unknown action: ${action}`);
   }
 }
@@ -153,3 +179,9 @@ export const createFolder = async (name, color) => (await send('CREATE_FOLDER', 
 export const moveSessionToFolder = (id, folderId) => send('MOVE_SESSION_TO_FOLDER', { id, folderId });
 export const updateSettings = async (partial) => (await send('UPDATE_SETTINGS', partial)).settings;
 export const exportSessionText = async (id) => (await send('EXPORT_SESSION_TEXT', { id })).text ?? '';
+
+// ── Cloud sync (Pro) ──
+export const getSyncStatus = async () => (await send('GET_SYNC_STATUS')).status ?? null;
+export const setSyncEnabled = async (enabled, credentials) => (await send('SET_SYNC_ENABLED', { enabled, credentials })).status ?? null;
+export const syncNow = async (passphrase) => (await send('SYNC_NOW', { passphrase })).status ?? null;
+export const assessPassphrase = async (passphrase) => (await send('ASSESS_PASSPHRASE', { passphrase })).assessment ?? null;

@@ -45,7 +45,7 @@ Status: ✅ done · 🛠 in progress · 📋 planned · 🔲 not started
 | Timed autosave (gated) | Dexter | ✅ | Armed only when `pro` |
 | Unlimited / long history | Storage (archive) + Core (wire) | 🛠 | Storage + **Core wiring DONE** (`ARCHIVE_SESSION` Pro-gated; restore ungated; auto-archive on startup) |
 | **Tab deduplication** | **Dexter** | ✅ | Wired & Pro-gated |
-| **Encrypted cloud sync + multi-device** | **Dexter (transport) + Storage (crypto/merge)** | 🛠 | Crypto + merge ✅; **Supabase transport + auth DONE** (`sync.js`, pull→merge→push, token refresh; 7 tests). Remaining: sign-in/passphrase UI (Lucik) + run the `vaults` table SQL in Supabase |
+| **Encrypted cloud sync + multi-device** | **Dexter (transport+UI) + Storage (crypto/merge)** | ✅ | Crypto + merge ✅; Supabase transport + auth (signin/**signup**, refresh, pull→merge→push) ✅; **sync UI in app/ (sign-in/up, passphrase + strength, Sync now)** ✅. Supabase `vaults` table live (Storage). 8 sync tests |
 | Smart folders (auto-rules) | Storage (rules) + Core (wire) + Lucik (UI) | 🛠 | Rules engine + **Core wiring DONE**; UI pending |
 | Project spaces | Storage + Core (wire) + Lucik (UI) | 🛠 | Storage model + **Core wiring DONE**; UI pending |
 | Full-vault backup (sessions + folders + smart folders) | Storage | ✅ | `exportData`/`importData` cover organization |

@@ -96,6 +96,23 @@ async function signInWithPassword(email, password) {
   return toAuth(await res.json(), email);
 }
 
+async function signUpWithPassword(email, password) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    let msg = `sign-up failed (${res.status})`;
+    try { const j = await res.json(); msg = j.msg || j.error_description || j.message || msg; } catch {}
+    throw new Error('AUTH_FAILED: ' + msg);
+  }
+  const json = await res.json();
+  // With "Confirm email" enabled Supabase returns a user but no session yet.
+  if (!json.access_token) throw new Error('AUTH_CONFIRM_REQUIRED: confirm your email, then sign in');
+  return toAuth(json, email);
+}
+
 async function refreshSession(refreshToken) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
     method: 'POST',
@@ -142,13 +159,16 @@ async function pullRemote(accessToken) {
 // ─── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Enable sync by signing in. `credentials` = { email, password }.
- * Stores the auth session; the passphrase is NOT part of this (per-sync only).
+ * Enable sync by authenticating. `credentials` = { email, password, signUp? }.
+ * `signUp: true` registers a new account; otherwise it signs in. Stores the auth
+ * session; the passphrase is NOT part of this (per-sync only).
  */
 export async function enable(credentials = {}) {
-  const { email, password } = credentials;
+  const { email, password, signUp } = credentials;
   if (!email || !password) throw new Error('AUTH_FAILED: email and password required');
-  const auth = await signInWithPassword(email, password);
+  const auth = signUp
+    ? await signUpWithPassword(email, password)
+    : await signInWithPassword(email, password);
   await setAuth(auth);
   return setStatus({ enabled: true, state: 'idle', error: null, email: auth.email });
 }

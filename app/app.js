@@ -68,6 +68,9 @@ let query = '';
 let spreadId = null;     // session id shown in deal-out overlay
 let trashOpen = false;
 let settingsOpen = false;
+let syncOpen = false;
+let syncMode = 'signin'; // 'signin' | 'signup'
+let syncPass = '';       // E2E passphrase, kept in memory only (never persisted)
 
 async function loadData() {
   const [folders, sessions, settings, stats] = await Promise.all([
@@ -138,6 +141,7 @@ function render() {
         <div class="head-actions">
           <div class="searchbox"><span>⌕</span><input id="search" class="mono" placeholder="SEARCH…" value="${esc(query)}" /></div>
           <button class="btn-squash tactile" id="squash">＋ SAVE OPEN TABS</button>
+          <button class="btn-gear tactile" id="cloud" title="Cloud sync">☁</button>
           <button class="btn-gear tactile" id="gear" title="Settings">⚙</button>
         </div>
       </div>
@@ -176,6 +180,7 @@ function render() {
   if (spreadId) renderSpread();
   if (trashOpen) renderTrashOverlay();
   if (settingsOpen) renderSettings();
+  if (syncOpen) renderSync();
 }
 
 function stackHTML(s, i) {
@@ -218,6 +223,7 @@ function wireDesk() {
   $('#search').oninput = (e) => { query = e.target.value; updateDim(); };
   $('#squash').onclick = onSquash;
   $('#gear').onclick = () => { settingsOpen = true; renderSettings(); };
+  $('#cloud').onclick = () => { syncOpen = true; renderSync(); };
   $('#trash-corner').onclick = () => { trashOpen = true; renderTrashOverlay(); };
 
   // stack action buttons (don't start a drag)
@@ -462,12 +468,95 @@ function renderSettings() {
 }
 function closeSettings() { settingsOpen = false; const ov = $('#overlay-settings'); if (ov) { ov.remove(); } render(); }
 
+// ── cloud sync panel ─────────────────────────────────────────────────────────────
+const STRENGTH_COLORS = ['#C4524E', '#C4524E', '#D9A431', '#2D9D78', '#2D9D78'];
+
+async function renderSync() {
+  const status = await api.getSyncStatus() || { enabled: false };
+  let ov = $('#overlay-sync');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'overlay-sync'; ov.className = 'modal-center'; app.appendChild(ov); }
+
+  const errLine = status.error ? `<div class="sync-err mono">${esc(status.error)}</div>` : '';
+  let body;
+  if (!status.enabled) {
+    body = `
+      <div class="set-section mono">${syncMode === 'signup' ? 'CREATE ACCOUNT' : 'SIGN IN'}</div>
+      <input id="sync-email" class="sync-input mono" type="email" placeholder="email" autocomplete="username" />
+      <input id="sync-pw" class="sync-input mono" type="password" placeholder="password" autocomplete="current-password" />
+      ${errLine}
+      <button class="btn-squash tactile" id="sync-connect" style="width:100%;margin-top:12px;transform:none">
+        ${syncMode === 'signup' ? 'CREATE ACCOUNT & CONNECT' : 'SIGN IN & CONNECT'}
+      </button>
+      <div class="sync-foot mono">
+        ${syncMode === 'signup' ? 'Have an account?' : 'New here?'}
+        <button class="sync-link" id="sync-toggle">${syncMode === 'signup' ? 'Sign in' : 'Create one'}</button>
+      </div>
+      <div class="sync-foot mono" style="opacity:.6">End-to-end encrypted. Your passphrase never leaves this device.</div>`;
+  } else {
+    const a = await api.assessPassphrase(syncPass);
+    const segs = Array.from({ length: 4 }).map((_, i) =>
+      `<span style="background:${i < a.score ? STRENGTH_COLORS[a.score] : 'var(--paperEdge)'}"></span>`).join('');
+    body = `
+      <div class="set-row"><div class="label"><div class="l">Signed in</div><div class="h mono">${esc(status.email || '')}</div></div>
+        <button class="actbtn" id="sync-out">SIGN OUT</button></div>
+      <div class="set-section mono">ENCRYPTION PASSPHRASE</div>
+      <input id="sync-pass" class="sync-input mono" type="password" placeholder="passphrase (same on every device)" value="${esc(syncPass)}" autocomplete="off" />
+      <div class="pp-bar" id="pp-bar">${segs}</div>
+      <div class="pp-label mono" id="pp-label">${syncPass ? esc(a.label) + (a.warnings[0] ? ' — ' + esc(a.warnings[0]) : '') : 'used to encrypt your vault before it leaves the device'}</div>
+      ${errLine}
+      <button class="btn-squash tactile" id="sync-now" style="width:100%;margin-top:14px;transform:none">⟳ SYNC NOW</button>
+      <div class="sync-foot mono">${status.lastSync ? 'Last synced ' + esc(ageOf(status.lastSync)) : 'Not synced yet'} · ${esc(status.state)}</div>`;
+  }
+
+  ov.innerHTML = `<div class="modal" style="width:420px">
+      <div class="modal-head"><span class="black" style="font-size:30px">CLOUD SYNC</span><span style="flex:1"></span><button class="actbtn" data-done>DONE ↩</button></div>
+      ${body}
+    </div>`;
+  ov.hidden = false;
+  ov.onclick = (e) => { if (e.target === ov) closeSync(); };
+  $('[data-done]', ov).onclick = closeSync;
+
+  if (!status.enabled) {
+    $('#sync-toggle', ov).onclick = () => { syncMode = syncMode === 'signup' ? 'signin' : 'signup'; renderSync(); };
+    $('#sync-connect', ov).onclick = async () => {
+      const email = $('#sync-email', ov).value.trim();
+      const password = $('#sync-pw', ov).value;
+      if (!email || !password) return toast('Enter email and password');
+      try {
+        await api.setSyncEnabled(true, { email, password, signUp: syncMode === 'signup' });
+        toast('☁ connected');
+        renderSync();
+      } catch (err) { await api.getSyncStatus(); renderSyncError(err.message); }
+    };
+  } else {
+    const pp = $('#sync-pass', ov);
+    pp.oninput = async () => {
+      syncPass = pp.value;
+      const a = await api.assessPassphrase(syncPass);
+      $('#pp-bar', ov).innerHTML = Array.from({ length: 4 }).map((_, i) =>
+        `<span style="background:${i < a.score ? STRENGTH_COLORS[a.score] : 'var(--paperEdge)'}"></span>`).join('');
+      $('#pp-label', ov).textContent = syncPass ? a.label + (a.warnings[0] ? ' — ' + a.warnings[0] : '') : 'used to encrypt your vault before it leaves the device';
+    };
+    $('#sync-out', ov).onclick = async () => { await api.setSyncEnabled(false); syncPass = ''; renderSync(); };
+    $('#sync-now', ov).onclick = async () => {
+      if (!syncPass) return toast('Enter your passphrase first');
+      $('#sync-now', ov).textContent = '⟳ SYNCING…';
+      const st = await api.syncNow(syncPass);
+      await loadData(); render(); renderSync();
+      toast(st && st.error ? 'Sync failed: ' + st.error : '☁ vault synced');
+    };
+  }
+}
+function renderSyncError(msg) { const ov = $('#overlay-sync'); if (!ov) return; const m = ov.querySelector('.modal'); const e = document.createElement('div'); e.className = 'sync-err mono'; e.textContent = msg; m.appendChild(e); }
+function closeSync() { syncOpen = false; const ov = $('#overlay-sync'); if (ov) ov.remove(); }
+
 // ── global keys ───────────────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if ($('#overlay-spread')) return closeSpread();
     if ($('#overlay-trash')) return closeTrash();
     if ($('#overlay-settings')) return closeSettings();
+    if ($('#overlay-sync')) return closeSync();
   }
   if ((e.key === '/' || (e.key === 'k' && (e.metaKey || e.ctrlKey))) && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) {
     e.preventDefault(); const s = $('#search'); if (s) s.focus();

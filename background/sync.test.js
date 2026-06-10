@@ -7,6 +7,9 @@ function fakeSupabase() {
   const state = { vault: null };
   const ok = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) });
   const fetchImpl = async (url, opts = {}) => {
+    if (url.includes('/auth/v1/signup')) {
+      return ok({ access_token: 'at-1', refresh_token: 'rt-1', user: { id: 'u-2', email: 'new@b.co' }, expires_in: 3600 });
+    }
     if (url.includes('/auth/v1/token')) {
       return ok({ access_token: 'at-1', refresh_token: 'rt-1', user: { id: 'u-1', email: 'a@b.co' }, expires_in: 3600 });
     }
@@ -20,12 +23,13 @@ function fakeSupabase() {
 }
 
 let remote;
+const realFetch = globalThis.fetch; // restore after, so we don't leak into other test files
 beforeEach(() => {
   installChromeMock();
   remote = fakeSupabase();
   globalThis.fetch = vi.fn(remote.fetchImpl);
 });
-afterEach(() => { vi.restoreAllMocks(); });
+afterEach(() => { vi.restoreAllMocks(); globalThis.fetch = realFetch; });
 
 const load = () => import('./sync.js');
 const PASS = 'correct horse battery';
@@ -48,6 +52,13 @@ describe('sync transport + auth', () => {
     expect(status.enabled).toBe(true);
     expect(status.email).toBe('a@b.co');
     expect(status.accessToken).toBeUndefined(); // never leaked publicly
+  });
+
+  it('enable({ signUp: true }) registers a new account', async () => {
+    const sync = await load();
+    const status = await sync.enable({ email: 'new@b.co', password: 'pw', signUp: true });
+    expect(status.enabled).toBe(true);
+    expect(status.email).toBe('new@b.co');
   });
 
   it('enable() rejects missing credentials', async () => {

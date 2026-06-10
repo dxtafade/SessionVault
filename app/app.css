@@ -195,6 +195,16 @@ body { background: var(--desk, #E9E1D2); }
 .toggle.on i { transform: translateX(18px); }
 .num { width: 64px; padding: 5px 8px; border: 1px solid var(--paperEdge); border-radius: 6px; font-size: 13px; text-align: right; background: var(--paper); color: var(--ink); font-family: "Space Mono", monospace; }
 
+/* cloud sync panel */
+.sync-input { width: 100%; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 8px; background: var(--paper); color: var(--ink); font-size: 13px; margin-top: 10px; outline: none; }
+.sync-input:focus { box-shadow: 2px 2px 0 var(--sub); }
+.sync-foot { font-size: 11px; color: var(--sub); margin-top: 12px; letter-spacing: .03em; }
+.sync-link { background: none; border: none; color: var(--ink); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.sync-err { margin-top: 10px; font-size: 11px; color: #C4524E; border: 1.5px solid #C4524E; border-radius: 6px; padding: 8px 10px; letter-spacing: .03em; }
+.pp-bar { display: flex; gap: 4px; margin-top: 10px; }
+.pp-bar span { flex: 1; height: 6px; border-radius: 99px; background: var(--paperEdge); transition: background .2s; }
+.pp-label { font-size: 10px; letter-spacing: .04em; color: var(--sub); margin-top: 6px; text-transform: uppercase; }
+
 /* toast */
 .toast {
   position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%);

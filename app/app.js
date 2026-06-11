@@ -72,6 +72,8 @@ let syncOpen = false;
 let proOpen = false;     // upgrade / entitlements modal
 let syncMode = 'signin'; // 'signin' | 'signup'
 let syncPass = '';       // E2E passphrase, kept in memory only (never persisted)
+let syncEmail = '';      // remembered email — prefilled across sign-in/up renders
+let confirmEmail = null; // when set, show the "confirm your email" success state
 
 async function loadData() {
   const [folders, sessions, settings, stats, ent, recovery] = await Promise.all([
@@ -542,9 +544,23 @@ async function renderSync() {
   const errLine = status.error ? `<div class="sync-err mono">${esc(status.error)}</div>` : '';
   let body;
   if (!status.enabled) {
+    // After a successful Create account, Supabase sends a confirmation link and
+    // returns no session yet — that's a SUCCESS, not an error. Show a friendly
+    // (non-red) block, with the account's email prefilled for the next sign-in.
+    const confirmBlock = confirmEmail ? `
+      <div class="sync-info">
+        <span class="si-ico">✉</span>
+        <div class="si-text">
+          <b>Almost there — confirm your email</b>
+          <span class="si-body">We sent a link to <b>${esc(confirmEmail)}</b>. Open it, tap “Confirm email”, then sign in.</span>
+          <span class="si-hint mono">Don't see it? Check Spam and Promotions — it can take a minute to arrive.</span>
+          <button class="si-resend mono" id="sync-resend">↻ Resend email</button>
+        </div>
+      </div>` : '';
     body = `
       <div class="set-section mono">${syncMode === 'signup' ? 'CREATE ACCOUNT' : 'SIGN IN'}</div>
-      <input id="sync-email" class="sync-input mono" type="email" placeholder="email" autocomplete="username" />
+      ${confirmBlock}
+      <input id="sync-email" class="sync-input mono" type="email" placeholder="email" autocomplete="username" value="${esc(syncEmail)}" />
       <input id="sync-pw" class="sync-input mono" type="password" placeholder="password" autocomplete="current-password" />
       ${errLine}
       <button class="btn-squash tactile" id="sync-connect" style="width:100%;margin-top:12px;transform:none">
@@ -580,16 +596,37 @@ async function renderSync() {
   $('[data-done]', ov).onclick = closeSync;
 
   if (!status.enabled) {
-    $('#sync-toggle', ov).onclick = () => { syncMode = syncMode === 'signup' ? 'signin' : 'signup'; renderSync(); };
+    $('#sync-email', ov).oninput = (e) => { syncEmail = e.target.value; };
+    $('#sync-toggle', ov).onclick = () => { syncMode = syncMode === 'signup' ? 'signin' : 'signup'; confirmEmail = null; renderSync(); };
+    const resend = $('#sync-resend', ov);
+    if (resend) resend.onclick = async () => {
+      resend.disabled = true; resend.textContent = '↻ Sending…';
+      try { await api.resendConfirmation(confirmEmail); toast('✉ confirmation email sent again'); }
+      catch { toast('Could not resend right now — try again in a minute'); }
+      finally { resend.disabled = false; resend.textContent = '↻ Resend email'; }
+    };
     $('#sync-connect', ov).onclick = async () => {
       const email = $('#sync-email', ov).value.trim();
       const password = $('#sync-pw', ov).value;
       if (!email || !password) return toast('Enter email and password');
+      syncEmail = email;
       try {
         await api.setSyncEnabled(true, { email, password, signUp: syncMode === 'signup' });
+        confirmEmail = null;
         toast('☁ connected');
         renderSync();
-      } catch (err) { await api.getSyncStatus(); renderSyncError(err.message); }
+      } catch (err) {
+        if (String(err.message).startsWith('AUTH_CONFIRM_REQUIRED')) {
+          // Success path: account created, email on its way. Switch to sign-in,
+          // keep the email prefilled, and surface the friendly confirm block.
+          confirmEmail = email;
+          syncMode = 'signin';
+          renderSync();
+        } else {
+          await api.getSyncStatus();
+          renderSyncError(err.message);
+        }
+      }
     };
   } else {
     const pp = $('#sync-pass', ov);

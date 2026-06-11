@@ -151,6 +151,9 @@ async function sendMock(action, payload = {}) {
     case 'SET_SYNC_ENABLED': {
       if (payload.enabled) {
         const email = payload.credentials?.email || 'you@example.com';
+        // Mirror the live backend (Confirm email ON): a fresh sign-up has no
+        // session yet — the user must confirm via the emailed link, then sign in.
+        if (payload.credentials?.signUp) throw new Error('AUTH_CONFIRM_REQUIRED: confirm your email, then sign in');
         db.sync = { enabled: true, state: 'idle', lastSync: null, error: null, email };
       } else { db.sync = { enabled: false, state: 'disabled', lastSync: null, error: null, email: null }; }
       save(db); return { status: db.sync };
@@ -161,6 +164,7 @@ async function sendMock(action, payload = {}) {
       db.sync = { ...db.sync, state: 'idle', lastSync: now, error: null }; save(db); return { status: db.sync };
     }
     case 'ASSESS_PASSPHRASE': return { assessment: mockAssess(payload.passphrase) };
+    case 'RESEND_CONFIRMATION': return { ok: true }; // preview stub — no real email sent
     case 'GET_RECOVERY': {
       // Peek, no side effects (the preview can't see real open tabs, so the
       // whole candidate counts as "missing").
@@ -209,6 +213,10 @@ export const getSyncStatus = async () => (await send('GET_SYNC_STATUS')).status 
 export const setSyncEnabled = async (enabled, credentials) => (await send('SET_SYNC_ENABLED', { enabled, credentials })).status ?? null;
 export const syncNow = async (passphrase) => (await send('SYNC_NOW', { passphrase })).status ?? null;
 export const assessPassphrase = async (passphrase) => (await send('ASSESS_PASSPHRASE', { passphrase })).assessment ?? null;
+// Re-send the sign-up confirmation email. Needs an engine RESEND_CONFIRMATION
+// action (Supabase /auth/v1/resend lives behind the anon key in background/);
+// until that lands the real path throws and the UI shows a friendly fallback.
+export const resendConfirmation = async (email) => { await send('RESEND_CONFIRMATION', { type: 'signup', email }); };
 
 // ── Crash recovery ──
 // Peek (no side effects): { available, tabCount, missingCount, savedAt }.

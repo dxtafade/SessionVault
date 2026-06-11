@@ -243,6 +243,29 @@ body { background: var(--desk, #E9E1D2); }
 .sync-foot { font-size: 11px; color: var(--sub); margin-top: 12px; letter-spacing: .03em; }
 .sync-link { background: none; border: none; color: var(--ink); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .sync-err { margin-top: 10px; font-size: 11px; color: #C4524E; border: 1.5px solid #C4524E; border-radius: 6px; padding: 8px 10px; letter-spacing: .03em; }
+
+/* "confirm your email" — a SUCCESS state, not an error: neutral card, green accent */
+.sync-info {
+  display: flex; gap: 11px; margin-top: 12px;
+  border: 2px solid #2D9D78; border-left-width: 5px; border-radius: 8px;
+  padding: 12px 13px; background: color-mix(in srgb, #2D9D78 9%, var(--paper));
+}
+.sync-info .si-ico {
+  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+  background: #2D9D78; color: #fff;
+}
+.sync-info .si-text { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.sync-info .si-text b { font-weight: 700; }
+.sync-info .si-text > b { font-size: 13px; }
+.sync-info .si-body { font-size: 12px; line-height: 1.45; color: var(--ink); }
+.sync-info .si-hint { font-size: 10px; letter-spacing: .03em; color: var(--sub); }
+.sync-info .si-resend {
+  align-self: flex-start; margin-top: 2px; background: none; border: none;
+  color: #2D9D78; font-size: 11px; cursor: pointer; padding: 0;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.sync-info .si-resend:disabled { opacity: .55; cursor: default; }
 .pp-bar { display: flex; gap: 4px; margin-top: 10px; }
 .pp-bar span { flex: 1; height: 6px; border-radius: 99px; background: var(--paperEdge); transition: background .2s; }
 .pp-label { font-size: 10px; letter-spacing: .04em; color: var(--sub); margin-top: 6px; text-transform: uppercase; }

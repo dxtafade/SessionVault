@@ -122,9 +122,12 @@ body { background: var(--desk, #E9E1D2); }
 
 /* crash-recovery prompt — the core "never lose your tabs" promise */
 .recover-banner {
+  /* position+z-index so the banner sits ABOVE the .stacks overlay (inset:0),
+     which would otherwise intercept every click on its buttons. */
+  position: relative; z-index: 10;
   display: flex; align-items: center; gap: 14px; margin: 0 44px 4px;
   border: 2px solid var(--ink); border-radius: 12px; padding: 13px 16px;
-  background: var(--paper); box-shadow: 5px 5px 0 var(--ink); z-index: 6;
+  background: var(--paper); box-shadow: 5px 5px 0 var(--ink);
   animation: rb-drop .45s var(--spring);
 }
 @keyframes rb-drop { from { opacity: 0; transform: translateY(-12px) rotate(-.6deg); } to { opacity: 1; transform: none; } }
@@ -244,40 +247,81 @@ body { background: var(--desk, #E9E1D2); }
 .pp-bar span { flex: 1; height: 6px; border-radius: 99px; background: var(--paperEdge); transition: background .2s; }
 .pp-label { font-size: 10px; letter-spacing: .04em; color: var(--sub); margin-top: 6px; text-transform: uppercase; }
 
-/* onboarding (first run; replayable from settings) */
-.onb-modal { width: 600px; max-width: 92vw; text-align: center; padding: 34px 44px 28px; overflow: hidden; }
-.onb-wordmark { font-family: "Space Mono", monospace; font-size: 11px; letter-spacing: .32em; color: var(--sub); }
-.onb-stage { position: relative; width: 100%; max-width: 440px; height: 220px; margin: 14px auto 0; }
+/* onboarding — scroll-driven narrative (first run; replayable from settings) */
+.onb-overlay { position: fixed; inset: 0; z-index: 120; background: var(--desk); color: var(--ink); overflow-y: auto; overflow-x: hidden; --par-x: 0px; --par-y: 0px; }
+.onb-track { height: 500vh; position: relative; }
+.onb-stage { position: sticky; top: 0; height: 100vh; overflow: hidden; }
+.onb-sec {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 8vw;
+  opacity: 0; transform: translateY(40px); pointer-events: none;
+  transition: opacity .6s var(--spring), transform .6s var(--spring);
+}
+.onb-sec.active { opacity: 1; transform: none; pointer-events: auto; }
+.onb-sec.off-above { opacity: 0; transform: translateY(-40px); }
+.onb-sec-hero, .onb-sec-cta { flex-direction: column; text-align: center; }
+.onb-sec-step { gap: 5vw; }
+.onb-step-text { flex: 0 1 440px; }
+
+.onb-micro { font-size: 11px; letter-spacing: .28em; color: var(--sub); margin-bottom: 14px; }
+.onb-h1 { font-family: "Archivo", sans-serif; font-weight: 900; letter-spacing: -.03em; font-size: clamp(40px, 6vw, 76px); line-height: .98; }
+.onb-h2 { font-family: "Archivo", sans-serif; font-weight: 900; letter-spacing: -.02em; font-size: clamp(30px, 3.6vw, 50px); line-height: 1.02; margin-top: 6px; }
+.onb-num { font-size: 13px; letter-spacing: .2em; color: var(--sub); }
+.onb-sub { color: var(--sub); font-size: 16px; line-height: 1.6; max-width: 460px; margin-top: 16px; }
+.onb-cta-inner { display: flex; flex-direction: column; align-items: center; gap: 26px; }
+.onb-wordmark { font-size: 12px; letter-spacing: .32em; color: var(--sub); }
+
+/* word + element reveal — plays when the section is active, resets when not */
+.onb-wline { display: block; }
+.onb-word { display: inline-block; opacity: 0; transform: translateY(.55em) rotate(2deg); }
+.onb-r { opacity: 0; transform: translateY(10px); }
+.onb-sec.active .onb-word { animation: onb-rise .55s var(--spring) forwards; animation-delay: var(--d); }
+.onb-sec.active .onb-r { animation: onb-rise .55s var(--spring) forwards; animation-delay: var(--d); }
+@keyframes onb-rise { to { opacity: 1; transform: none; } }
+
+/* art — reused card/tag/device building blocks */
+.onb-art { position: relative; width: 360px; height: 210px; margin: 0 auto; }
+.onb-step-art { flex: 0 0 auto; }
+.onb-art-inner { position: absolute; inset: 0; transform: translate(var(--par-x), var(--par-y)); transition: transform .35s ease; animation: onb-float 6s ease-in-out infinite; }
+@keyframes onb-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -10px; } }
 .onb-card {
-  position: absolute; left: 50%; top: 50%; width: 148px; height: 94px; margin: -47px 0 0 -74px;
+  position: absolute; left: 50%; top: 50%; width: 130px; height: 84px;
   background: var(--paper); border: 1px solid var(--paperEdge); border-radius: 10px; box-shadow: var(--shadow);
   display: flex; flex-direction: column; overflow: hidden;
-  transition: transform .7s var(--spring), opacity .5s var(--spring);
 }
-.onb-card .cstrip { height: 11px; flex: 0 0 auto; }
-.onb-card .clines { padding: 11px 12px 0; }
+.onb-card .cstrip { height: 10px; flex: 0 0 auto; }
+.onb-card .clines { padding: 10px 11px 0; }
 .onb-line { height: 6px; border-radius: 3px; background: var(--sub); opacity: .22; margin-top: 6px; }
 .onb-line.a { width: 64%; opacity: .5; }
 .onb-layer { position: absolute; inset: 0; pointer-events: none; }
+.onb-devrow { display: flex; align-items: flex-end; justify-content: center; gap: 26px; }
 .onb-tag {
   position: absolute; left: 50%; top: 50%; display: inline-flex; align-items: center; gap: 7px;
   font-family: "Space Mono", monospace; font-size: 11px; padding: 5px 12px; border-radius: 99px;
   border: 1.5px solid; background: var(--paper); box-shadow: var(--shadow); white-space: nowrap;
-  /* opacity-only fade — must NOT reset transform, or the per-tag translate is lost */
   animation: onb-fadein .45s ease both;
 }
 @keyframes onb-fadein { from { opacity: 0; } to { opacity: 1; } }
 .onb-tag .d { width: 8px; height: 8px; border-radius: 3px; }
 .onb-dev { display: flex; flex-direction: column; align-items: center; gap: 8px; animation: pop .5s var(--spring) both; }
 .onb-dev .glyph { width: 56px; height: 56px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--paper); border: 2px solid var(--ink); box-shadow: var(--shadow); }
-.onb-title { font-family: "Archivo", sans-serif; font-weight: 900; letter-spacing: -.02em; font-size: 32px; line-height: 1.04; white-space: pre-line; margin-top: 14px; }
-.onb-body { color: var(--sub); font-size: 15px; line-height: 1.55; max-width: 430px; margin: 12px auto 26px; }
-.onb-foot { display: flex; align-items: center; gap: 12px; }
-.onb-dots { flex: 1; display: flex; justify-content: center; gap: 7px; }
-.onb-dot { width: 7px; height: 7px; border-radius: 99px; border: none; padding: 0; background: var(--paperEdge); cursor: pointer; transition: all .3s var(--spring); }
-.onb-dot.on { width: 22px; background: var(--ink); }
-.onb-next { border: 2px solid var(--ink); background: var(--ink); color: var(--desk); border-radius: 8px; padding: 11px 18px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 3px 3px 0 var(--sub); display: inline-flex; align-items: center; gap: 7px; }
-.onb-skip { border: 2px solid var(--ink); background: var(--paper); color: var(--ink); border-radius: 8px; padding: 11px 16px; font-size: 13px; cursor: pointer; }
+.onb-dev .onb-check { color: var(--sub); }
+
+/* fixed chrome */
+.onb-logo { position: fixed; top: 22px; left: 26px; font-size: 12px; letter-spacing: .28em; color: var(--ink); z-index: 2; }
+.onb-skip { position: fixed; top: 18px; right: 24px; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); border-radius: 8px; padding: 9px 16px; font-size: 13px; cursor: pointer; z-index: 2; }
+.onb-rail { position: fixed; bottom: 26px; left: 26px; display: flex; align-items: center; gap: 10px; font-size: 11px; letter-spacing: .14em; color: var(--sub); z-index: 2; }
+.onb-rail .bar { width: 120px; height: 2px; background: var(--paperEdge); border-radius: 2px; overflow: hidden; }
+.onb-rail .bar i { display: block; height: 100%; width: 0; background: var(--ink); transition: width .5s var(--spring); }
+.onb-hint { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; font-size: 11px; letter-spacing: .14em; color: var(--sub); transition: opacity .4s; z-index: 2; }
+.onb-hint .line { width: 1px; height: 26px; background: var(--sub); transform-origin: top; animation: onb-hintline 1.6s ease-in-out infinite; }
+@keyframes onb-hintline { 0%, 100% { transform: scaleY(.4); opacity: .4; } 50% { transform: scaleY(1); opacity: 1; } }
+.onb-next { border: 2px solid var(--ink); background: var(--ink); color: var(--desk); border-radius: 10px; padding: 14px 30px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 4px 4px 0 var(--sub); }
+.onb-next:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--sub); }
+
+@media (max-width: 860px) {
+  .onb-sec-step { flex-direction: column; gap: 24px; text-align: center; }
+  .onb-step-art { display: none; }
+}
 
 /* toast */
 .toast {

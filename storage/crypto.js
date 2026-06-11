@@ -19,14 +19,21 @@
 import { bytesToBase64, base64ToBytes } from './gzip.js';
 
 const VERSION = 'v1';
-const PBKDF2_ITERATIONS = 210_000; // OWASP-tier for PBKDF2-HMAC-SHA256
+// OWASP 2023 guidance for PBKDF2-HMAC-SHA256. New blobs always use this.
+const PBKDF2_ITERATIONS = 600_000;
+// Iteration counts older `v1` blobs may have been encrypted with. decryptBlob
+// falls back through these so vaults written before the count was raised still
+// open — and the next sync re-encrypts them at PBKDF2_ITERATIONS, healing them.
+// (The proper long-term move is to embed the count in the envelope under a new
+// VERSION; until then, any future change MUST be added here, not swapped in.)
+const LEGACY_ITERATIONS = [210_000];
 const SALT_BYTES = 16;
 const IV_BYTES = 12;
 
 // Web Crypto: global in MV3 service workers, the popup, and Node 18+.
 const subtle = globalThis.crypto.subtle;
 
-async function deriveKey(passphrase, salt) {
+async function deriveKey(passphrase, salt, iterations = PBKDF2_ITERATIONS) {
   const baseKey = await subtle.importKey(
     'raw',
     new TextEncoder().encode(passphrase),
@@ -35,7 +42,7 @@ async function deriveKey(passphrase, salt) {
     ['deriveKey'],
   );
   return subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
     baseKey,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -117,8 +124,18 @@ export async function decryptBlob(cipher, passphrase) {
     const iv = packed.slice(SALT_BYTES, SALT_BYTES + IV_BYTES);
     const ct = packed.slice(SALT_BYTES + IV_BYTES);
 
-    const key = await deriveKey(passphrase, salt);
-    const plainBuf = await subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+    // Try the current iteration count, then any legacy counts — an old vault
+    // encrypted before the count was raised must still open. A genuinely wrong
+    // passphrase fails every candidate and falls through to DECRYPT_FAILED.
+    let plainBuf = null;
+    for (const iterations of [PBKDF2_ITERATIONS, ...LEGACY_ITERATIONS]) {
+      try {
+        const key = await deriveKey(passphrase, salt, iterations);
+        plainBuf = await subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+        break;
+      } catch { /* try the next iteration count */ }
+    }
+    if (!plainBuf) throw new Error('auth failed');
     return JSON.parse(new TextDecoder().decode(plainBuf));
   } catch (err) {
     if (err?.message?.startsWith('DECRYPT_FAILED')) throw err;

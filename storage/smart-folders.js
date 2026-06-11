@@ -23,7 +23,7 @@
  * matches if ANY value satisfies it. String comparison is case-insensitive.
  */
 
-import { getAllSessions } from './storage.js';
+import { getAllSessions, sanitizeColor } from './storage.js';
 
 const KEY = 'smartFolders';
 
@@ -139,7 +139,7 @@ export async function createSmartFolder(name, rules, { color = null } = {}) {
   validateRules(rules);
   const all = await getSmartFolders();
   const now = Date.now();
-  const folder = { id: _id(), name, color, createdAt: now, updatedAt: now, rules };
+  const folder = { id: _id(), name, color: sanitizeColor(color), createdAt: now, updatedAt: now, rules };
   all[folder.id] = folder;
   await chrome.storage.local.set({ [KEY]: all });
   return folder;
@@ -149,7 +149,9 @@ export async function updateSmartFolder(id, partial = {}) {
   const all = await getSmartFolders();
   if (!all[id]) throw new Error(`Smart folder ${id} not found`);
   if (partial.rules !== undefined) validateRules(partial.rules);
-  all[id] = { ...all[id], ...partial, id, updatedAt: Date.now() };
+  const clean = { ...partial };
+  if ('color' in clean) clean.color = sanitizeColor(clean.color);
+  all[id] = { ...all[id], ...clean, id, updatedAt: Date.now() };
   await chrome.storage.local.set({ [KEY]: all });
   return all[id];
 }

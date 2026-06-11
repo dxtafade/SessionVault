@@ -47,15 +47,16 @@ beforeEach(() => {
 
 describe('cloud-sync storage chain (fake remote)', () => {
   it('propagates a vault from device A to a fresh device B', async () => {
-    // Device A
-    await store.saveSession(sess('s1', 100));
+    // Device A — give the session a long, distinctive plaintext marker so the
+    // opacity check below is meaningful (a 2-char id can occur in base64 by chance).
+    await store.saveSession(sess('s1', 100, 'PLAINTEXT_MARKER_b7f3a9'));
     await store.createFolder('Work');
     const remote = { blob: null };
     await push(remote, PASS);
 
-    // The remote only ever holds opaque ciphertext.
+    // The remote only ever holds opaque ciphertext — no plaintext leaks.
     expect(typeof remote.blob).toBe('string');
-    expect(remote.blob).not.toContain('s1');
+    expect(remote.blob).not.toContain('PLAINTEXT_MARKER_b7f3a9');
 
     // Device B (fresh storage) pulls and merges.
     installChromeMock();

@@ -5,7 +5,6 @@
   "description": "Never lose your tabs again. Save, restore, and sync your browser sessions.",
   "permissions": [
     "tabs",
-    "sessions",
     "storage",
     "alarms"
   ],

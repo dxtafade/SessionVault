@@ -54,6 +54,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const QUOTA_WARNING_PERCENT = 75;
 const QUOTA_CRITICAL_PERCENT = 90;
 
+// UI colors are interpolated into inline styles by the UI, so only accept a
+// plain hex color on write (defense-in-depth). Anything else becomes null.
+const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+export function sanitizeColor(color) {
+  return typeof color === 'string' && HEX_COLOR_RE.test(color.trim()) ? color.trim() : null;
+}
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 async function _read(keys) {
@@ -382,14 +389,17 @@ export async function importData(blob, mode = 'merge') {
 
   if (blob.settings && replace) patch.settings = blob.settings;
 
+  // Organization collections are validated too — a malformed or corrupt backup
+  // file must not inject garbage that breaks the folder/smart-folder engines.
+  // Bad entries are dropped, not written.
   if (blob.folders && typeof blob.folders === 'object') {
-    patch.folders = { ...(foldersBase?.folders ?? {}), ...blob.folders };
+    patch.folders = { ...(foldersBase?.folders ?? {}), ..._pickValid(blob.folders, isValidFolder) };
   }
   if (blob.smartFolders && typeof blob.smartFolders === 'object') {
-    patch.smartFolders = { ...(smartBase?.smartFolders ?? {}), ...blob.smartFolders };
+    patch.smartFolders = { ...(smartBase?.smartFolders ?? {}), ..._pickValid(blob.smartFolders, isValidSmartFolder) };
   }
   if (blob.spaces && typeof blob.spaces === 'object') {
-    patch.spaces = { ...(spacesBase?.spaces ?? {}), ...blob.spaces };
+    patch.spaces = { ...(spacesBase?.spaces ?? {}), ..._pickValid(blob.spaces, isValidSpace) };
   }
 
   await _write(patch); // single atomic write
@@ -511,7 +521,7 @@ export async function getFolder(id) {
 export async function createFolder(name, { color = null } = {}) {
   const folders = await getFolders();
   const now = Date.now();
-  const folder = { id: _folderId(), name, color, createdAt: now, updatedAt: now };
+  const folder = { id: _folderId(), name, color: sanitizeColor(color), createdAt: now, updatedAt: now };
   folders[folder.id] = folder;
   await _write({ folders });
   return folder;
@@ -700,4 +710,32 @@ function isValidSession(s) {
     typeof s.createdAt === 'number' &&
     Array.isArray(s.tabs)
   );
+}
+
+function isValidFolder(f) {
+  return f && typeof f.id === 'string' && typeof f.name === 'string';
+}
+
+function isValidSpace(s) {
+  return s && typeof s.id === 'string' && typeof s.name === 'string';
+}
+
+function isValidSmartFolder(sf) {
+  return (
+    sf &&
+    typeof sf.id === 'string' &&
+    typeof sf.name === 'string' &&
+    sf.rules && typeof sf.rules === 'object' &&
+    (sf.rules.match === 'all' || sf.rules.match === 'any') &&
+    Array.isArray(sf.rules.conditions)
+  );
+}
+
+/** Returns a new map keeping only the entries that pass `validate`. */
+function _pickValid(map, validate) {
+  const out = {};
+  for (const [id, v] of Object.entries(map ?? {})) {
+    if (validate(v)) out[id] = v;
+  }
+  return out;
 }

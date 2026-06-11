@@ -191,7 +191,7 @@ describe('export / import', () => {
   it('export includes folders + smartFolders; import restores them', async () => {
     await store.saveSession(makeSession('a', 'A'));
     const folder = await store.createFolder('Work');
-    await chrome.storage.local.set({ smartFolders: { sf1: { id: 'sf1', name: 'Dev' } } });
+    await chrome.storage.local.set({ smartFolders: { sf1: { id: 'sf1', name: 'Dev', rules: { match: 'all', conditions: [{ field: 'url', op: 'contains', value: 'x' }] } } } });
 
     const blob = JSON.parse(JSON.stringify(await store.exportData()));
     expect(blob.folders[folder.id]).toBeDefined();
@@ -215,11 +215,63 @@ describe('export / import', () => {
     expect(Object.keys(folders).sort()).toEqual([keep.id, 'f2'].sort());
   });
 
+  it('drops malformed folders/spaces on import, keeps valid ones', async () => {
+    const blob = {
+      sessions: {},
+      folders: {
+        good: { id: 'good', name: 'Good', createdAt: 1, updatedAt: 1 },
+        bad: { id: 'bad' },              // missing name
+        junk: 'not-an-object',
+      },
+      spaces: {
+        sp: { id: 'sp', name: 'Space' },
+        broken: { name: 'no id' },       // missing id
+      },
+    };
+    await store.importData(blob, 'replace');
+
+    expect(Object.keys(await store.getFolders())).toEqual(['good']);
+    const { spaces } = await chrome.storage.local.get('spaces');
+    expect(Object.keys(spaces)).toEqual(['sp']);
+  });
+
+  it('drops smart folders with malformed rules, keeps well-formed ones', async () => {
+    const blob = {
+      sessions: {},
+      smartFolders: {
+        ok: { id: 'ok', name: 'Dev', rules: { match: 'all', conditions: [{ field: 'url', op: 'contains', value: 'x' }] } },
+        noRules: { id: 'noRules', name: 'X' },                       // missing rules
+        badMatch: { id: 'badMatch', name: 'Y', rules: { match: 'maybe', conditions: [] } },
+        badConds: { id: 'badConds', name: 'Z', rules: { match: 'any', conditions: 'nope' } },
+      },
+    };
+    await store.importData(blob, 'replace');
+
+    const { smartFolders } = await chrome.storage.local.get('smartFolders');
+    expect(Object.keys(smartFolders)).toEqual(['ok']);
+  });
+
+  it('does not drop valid organization on a sync-style merged vault', async () => {
+    // mergeVault output of real (always-valid) records must survive import intact.
+    const blob = {
+      sessions: { a: makeSession('a', 'A') },
+      folders: { f1: { id: 'f1', name: 'Work', createdAt: 1, updatedAt: 1 } },
+      smartFolders: { sf: { id: 'sf', name: 'Dev', rules: { match: 'all', conditions: [{ field: 'name', op: 'contains', value: 'a' }] } } },
+      spaces: { sp: { id: 'sp', name: 'Proj', createdAt: 1, updatedAt: 1 } },
+    };
+    await store.importData(blob, 'replace');
+
+    expect(await store.getFolder('f1')).not.toBeNull();
+    const { smartFolders, spaces } = await chrome.storage.local.get(['smartFolders', 'spaces']);
+    expect(smartFolders.sf).toBeDefined();
+    expect(spaces.sp).toBeDefined();
+  });
+
   it('applies the whole vault in a single atomic write (sync-persist safety)', async () => {
     const blob = {
       sessions: { a: makeSession('a', 'A') },
       folders: { f1: { id: 'f1', name: 'F', createdAt: 1, updatedAt: 1 } },
-      smartFolders: { sf1: { id: 'sf1', name: 'SF' } },
+      smartFolders: { sf1: { id: 'sf1', name: 'SF', rules: { match: 'all', conditions: [{ field: 'name', op: 'contains', value: 'a' }] } } },
       spaces: { sp1: { id: 'sp1', name: 'SP' } },
     };
 

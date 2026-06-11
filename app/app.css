@@ -205,6 +205,41 @@ body { background: var(--desk, #E9E1D2); }
 .pp-bar span { flex: 1; height: 6px; border-radius: 99px; background: var(--paperEdge); transition: background .2s; }
 .pp-label { font-size: 10px; letter-spacing: .04em; color: var(--sub); margin-top: 6px; text-transform: uppercase; }
 
+/* onboarding (first run; replayable from settings) */
+.onb-modal { width: 600px; max-width: 92vw; text-align: center; padding: 34px 44px 28px; overflow: hidden; }
+.onb-wordmark { font-family: "Space Mono", monospace; font-size: 11px; letter-spacing: .32em; color: var(--sub); }
+.onb-stage { position: relative; width: 100%; max-width: 440px; height: 220px; margin: 14px auto 0; }
+.onb-card {
+  position: absolute; left: 50%; top: 50%; width: 148px; height: 94px; margin: -47px 0 0 -74px;
+  background: var(--paper); border: 1px solid var(--paperEdge); border-radius: 10px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; overflow: hidden;
+  transition: transform .7s var(--spring), opacity .5s var(--spring);
+}
+.onb-card .cstrip { height: 11px; flex: 0 0 auto; }
+.onb-card .clines { padding: 11px 12px 0; }
+.onb-line { height: 6px; border-radius: 3px; background: var(--sub); opacity: .22; margin-top: 6px; }
+.onb-line.a { width: 64%; opacity: .5; }
+.onb-layer { position: absolute; inset: 0; pointer-events: none; }
+.onb-tag {
+  position: absolute; left: 50%; top: 50%; display: inline-flex; align-items: center; gap: 7px;
+  font-family: "Space Mono", monospace; font-size: 11px; padding: 5px 12px; border-radius: 99px;
+  border: 1.5px solid; background: var(--paper); box-shadow: var(--shadow); white-space: nowrap;
+  /* opacity-only fade — must NOT reset transform, or the per-tag translate is lost */
+  animation: onb-fadein .45s ease both;
+}
+@keyframes onb-fadein { from { opacity: 0; } to { opacity: 1; } }
+.onb-tag .d { width: 8px; height: 8px; border-radius: 3px; }
+.onb-dev { display: flex; flex-direction: column; align-items: center; gap: 8px; animation: pop .5s var(--spring) both; }
+.onb-dev .glyph { width: 56px; height: 56px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--paper); border: 2px solid var(--ink); box-shadow: var(--shadow); }
+.onb-title { font-family: "Archivo", sans-serif; font-weight: 900; letter-spacing: -.02em; font-size: 32px; line-height: 1.04; white-space: pre-line; margin-top: 14px; }
+.onb-body { color: var(--sub); font-size: 15px; line-height: 1.55; max-width: 430px; margin: 12px auto 26px; }
+.onb-foot { display: flex; align-items: center; gap: 12px; }
+.onb-dots { flex: 1; display: flex; justify-content: center; gap: 7px; }
+.onb-dot { width: 7px; height: 7px; border-radius: 99px; border: none; padding: 0; background: var(--paperEdge); cursor: pointer; transition: all .3s var(--spring); }
+.onb-dot.on { width: 22px; background: var(--ink); }
+.onb-next { border: 2px solid var(--ink); background: var(--ink); color: var(--desk); border-radius: 8px; padding: 11px 18px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 3px 3px 0 var(--sub); display: inline-flex; align-items: center; gap: 7px; }
+.onb-skip { border: 2px solid var(--ink); background: var(--paper); color: var(--ink); border-radius: 8px; padding: 11px 16px; font-size: 13px; cursor: pointer; }
+
 /* toast */
 .toast {
   position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%);

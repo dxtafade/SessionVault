@@ -108,6 +108,45 @@ body { background: var(--desk, #E9E1D2); }
 }
 .btn-gear { border: 2px solid var(--ink); background: var(--paper); color: var(--ink); border-radius: 50%; width: 42px; height: 42px; font-size: 16px; }
 
+/* free-plan saved-sessions counter (Option A: visible 50-session cap) */
+.limit-chip {
+  display: inline-flex; align-items: center; gap: 1px; border: 2px solid var(--ink);
+  background: var(--paper); color: var(--ink); border-radius: 8px;
+  padding: 8px 11px; font-size: 12px; letter-spacing: .06em; line-height: 1;
+  transform: rotate(-1deg); box-shadow: 3px 3px 0 var(--sub); white-space: nowrap;
+}
+.limit-chip .sep { opacity: .4; margin: 0 2px; }
+.limit-chip[data-level="near"] { border-color: #D9A431; color: #D9A431; box-shadow: 3px 3px 0 rgba(217,164,49,.4); }
+.limit-chip[data-level="full"] { border-color: #C4524E; color: #C4524E; box-shadow: 3px 3px 0 rgba(196,82,78,.45); }
+.limit-chip[data-level="pro"]  { border-color: #2D9D78; color: #2D9D78; box-shadow: 3px 3px 0 rgba(45,157,120,.4); }
+
+/* crash-recovery prompt — the core "never lose your tabs" promise */
+.recover-banner {
+  display: flex; align-items: center; gap: 14px; margin: 0 44px 4px;
+  border: 2px solid var(--ink); border-radius: 12px; padding: 13px 16px;
+  background: var(--paper); box-shadow: 5px 5px 0 var(--ink); z-index: 6;
+  animation: rb-drop .45s var(--spring);
+}
+@keyframes rb-drop { from { opacity: 0; transform: translateY(-12px) rotate(-.6deg); } to { opacity: 1; transform: none; } }
+.recover-banner .rb-ico {
+  display: flex; align-items: center; justify-content: center; flex: none;
+  width: 38px; height: 38px; border-radius: 50%; font-size: 19px;
+  border: 2px solid var(--ink); background: var(--desk);
+}
+.recover-banner .rb-text { display: flex; flex-direction: column; gap: 2px; }
+.recover-banner .rb-text b { font-size: 15px; letter-spacing: .01em; }
+.recover-banner .rb-sub { font-size: 10px; letter-spacing: .07em; opacity: .6; }
+.recover-banner .rb-do {
+  border: 2px solid var(--ink); background: var(--ink); color: var(--desk);
+  border-radius: 8px; padding: 11px 15px; font-size: 11px; letter-spacing: .08em;
+  font-family: "Space Mono", monospace; box-shadow: 3px 3px 0 var(--sub);
+}
+.recover-banner .rb-do:disabled { opacity: .6; }
+.recover-banner .rb-x {
+  border: 2px solid var(--ink); background: var(--paper); color: var(--ink);
+  border-radius: 50%; width: 34px; height: 34px; font-size: 16px; flex: none;
+}
+
 .stats-stamp {
   position: absolute; left: 44px; bottom: 30px; transform: rotate(-2deg);
   border: 2px solid var(--ink); border-radius: 6px; padding: 9px 15px;

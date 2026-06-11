@@ -85,6 +85,21 @@ async function loadData() {
 const isPro = () => !!state.entitlements?.pro;
 const freeLimit = () => state.limits?.freeSessionLimit ?? 50;
 const savedCount = () => Object.keys(state.sessions).length;
+// near = within the last 5 of the cap; full = at/over it
+function limitLevel() {
+  if (isPro()) return 'pro';
+  const n = savedCount(), lim = freeLimit();
+  if (n >= lim) return 'full';
+  if (n >= lim - 5) return 'near';
+  return 'ok';
+}
+
+// ── crash-recovery prompt ───────────────────────────────────────────────────────
+// Offered once per page open (the engine keeps a rolling emergency snapshot and
+// only commits it on RECOVER_LAST). Dismissal is per browser session.
+const RECOVER_DISMISS_KEY = 'sv_recover_dismissed';
+function recoverDismissed() { try { return sessionStorage.getItem(RECOVER_DISMISS_KEY) === '1'; } catch { return false; } }
+function dismissRecover() { try { sessionStorage.setItem(RECOVER_DISMISS_KEY, '1'); } catch {} }
 
 // shelves = Unfiled + every folder, each with its sessions
 function shelves() {
@@ -148,10 +163,26 @@ function render() {
         <div class="head-actions">
           <div class="searchbox"><span>⌕</span><input id="search" class="mono" placeholder="SEARCH…" value="${esc(query)}" /></div>
           <button class="btn-squash tactile" id="squash">＋ SAVE OPEN TABS</button>
+          <div class="limit-chip mono" data-level="${limitLevel()}" id="limit-chip"
+               title="${isPro() ? 'Pro — unlimited saved sessions' : `${savedCount()} of ${freeLimit()} free saved sessions`}">
+            ${isPro() ? '∞ PRO' : `${savedCount()}<span class="sep">/</span>${freeLimit()}`}
+          </div>
           <button class="btn-gear tactile" id="cloud" title="Cloud sync">☁</button>
           <button class="btn-gear tactile" id="gear" title="Settings">⚙</button>
         </div>
       </div>
+
+      ${(!recoverDismissed()) ? `
+      <div class="recover-banner" id="recover-banner">
+        <span class="rb-ico">↩</span>
+        <div class="rb-text">
+          <b>Did your browser close unexpectedly?</b>
+          <span class="rb-sub mono">Bring back the tabs you had open before — they're never lost.</span>
+        </div>
+        <span style="flex:1"></span>
+        <button class="rb-do tactile" id="recover-do">↩ RECOVER TABS</button>
+        <button class="rb-x tactile" id="recover-x" title="Dismiss">×</button>
+      </div>` : ''}
 
       <div class="stats-stamp mono">${st ? `${st.totalTabs} TABS KEPT ★ ${st.sessions.total} SESSIONS` : 'SESSIONVAULT'}</div>
 
@@ -232,6 +263,11 @@ function wireDesk() {
   $('#gear').onclick = () => { settingsOpen = true; renderSettings(); };
   $('#cloud').onclick = () => { syncOpen = true; renderSync(); };
   $('#trash-corner').onclick = () => { trashOpen = true; renderTrashOverlay(); };
+
+  // crash-recovery banner
+  const rdo = $('#recover-do'), rx = $('#recover-x');
+  if (rdo) rdo.onclick = onRecover;
+  if (rx) rx.onclick = () => { dismissRecover(); render(); };
 
   // stack action buttons (don't start a drag)
   app.querySelectorAll('.actbtn').forEach((b) => {
@@ -318,6 +354,25 @@ async function onStackAct(act, id, viaDrop) {
     spreadId = null;
     await refresh();
     toast(`“${s.name}” moved to the bin`, async () => { await api.restoreFromTrash(id); await refresh(); });
+  }
+}
+
+async function onRecover() {
+  const btn = $('#recover-do'); if (btn) { btn.disabled = true; btn.textContent = '↩ RECOVERING…'; }
+  try {
+    const s = await api.recoverLast();
+    dismissRecover();
+    if (s) {
+      activeShelf = UNFILED;
+      await refresh();
+      toast(`↩ recovered ${s.tabs.length} tabs into a new session`);
+    } else {
+      render();
+      toast('Nothing to recover — no snapshot from a previous session');
+    }
+  } catch (err) {
+    render();
+    toast('Could not recover: ' + err.message);
   }
 }
 

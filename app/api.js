@@ -155,6 +155,19 @@ async function sendMock(action, payload = {}) {
       db.sync = { ...db.sync, state: 'idle', lastSync: now, error: null }; save(db); return { status: db.sync };
     }
     case 'ASSESS_PASSPHRASE': return { assessment: mockAssess(payload.passphrase) };
+    case 'RECOVER_LAST': {
+      // Preview stand-in for the engine's emergency snapshot: synthesize a
+      // "tabs from before the crash" session so the recovery flow is testable.
+      const id = genId();
+      const s = { id, name: payload.name || `Recovered — ${new Date(now).toLocaleString()}`,
+        folderId: null, createdAt: now, updatedAt: now, isAuto: false,
+        tabs: [
+          { url: 'https://news.ycombinator.com', title: 'Hacker News', favIconUrl: '', pinned: false, index: 0 },
+          { url: 'https://github.com/dashboard', title: 'GitHub · Dashboard', favIconUrl: '', pinned: false, index: 1 },
+          { url: 'https://mail.google.com', title: 'Inbox (3) — Mail', favIconUrl: '', pinned: false, index: 2 },
+        ] };
+      db.sessions[id] = s; save(db); return { session: s };
+    }
     case 'GET_ENTITLEMENTS': return { entitlements: db.entitlements || { pro: false }, limits: { freeSessionLimit: 50 } };
     case 'SET_PRO': db.entitlements = { pro: !!payload.pro }; save(db); return { entitlements: db.entitlements };
     default: throw new Error(`Unknown action: ${action}`);
@@ -187,6 +200,10 @@ export const getSyncStatus = async () => (await send('GET_SYNC_STATUS')).status 
 export const setSyncEnabled = async (enabled, credentials) => (await send('SET_SYNC_ENABLED', { enabled, credentials })).status ?? null;
 export const syncNow = async (passphrase) => (await send('SYNC_NOW', { passphrase })).status ?? null;
 export const assessPassphrase = async (passphrase) => (await send('ASSESS_PASSPHRASE', { passphrase })).assessment ?? null;
+
+// ── Crash recovery — RECOVER_LAST commits the emergency snapshot, so only call
+//    it on an explicit user action. Returns the recovered session, or null. ──
+export const recoverLast = async (name) => (await send('RECOVER_LAST', name ? { name } : {})).session ?? null;
 
 // ── Entitlements (free vs Pro) — see docs/TIERS.md ──
 export const getEntitlements = async () => {

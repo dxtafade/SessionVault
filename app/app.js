@@ -62,7 +62,7 @@ function savePos(shelfId, map) { try { localStorage.setItem('sv_app_pos:' + shel
 
 // ── state ───────────────────────────────────────────────────────────────────────
 let prefs = loadPrefs();
-let state = { folders: {}, sessions: {}, settings: {}, stats: null, entitlements: { pro: false }, limits: { freeSessionLimit: 50 } };
+let state = { folders: {}, sessions: {}, settings: {}, stats: null, entitlements: { pro: false }, limits: { freeSessionLimit: 50 }, recovery: { available: false } };
 let activeShelf = UNFILED;
 let query = '';
 let spreadId = null;     // session id shown in deal-out overlay
@@ -74,11 +74,12 @@ let syncMode = 'signin'; // 'signin' | 'signup'
 let syncPass = '';       // E2E passphrase, kept in memory only (never persisted)
 
 async function loadData() {
-  const [folders, sessions, settings, stats, ent] = await Promise.all([
+  const [folders, sessions, settings, stats, ent, recovery] = await Promise.all([
     api.getFolders(), api.getSessions(), api.getSettings(), api.getStats().catch(() => null),
     api.getEntitlements().catch(() => ({ entitlements: { pro: false }, limits: { freeSessionLimit: 50 } })),
+    api.getRecovery().catch(() => ({ available: false })),
   ]);
-  state = { folders, sessions, settings, stats, entitlements: ent.entitlements, limits: ent.limits };
+  state = { folders, sessions, settings, stats, entitlements: ent.entitlements, limits: ent.limits, recovery };
 }
 
 // ── entitlements helpers ────────────────────────────────────────────────────────
@@ -95,11 +96,10 @@ function limitLevel() {
 }
 
 // ── crash-recovery prompt ───────────────────────────────────────────────────────
-// Offered once per page open (the engine keeps a rolling emergency snapshot and
-// only commits it on RECOVER_LAST). Dismissal is per browser session.
-const RECOVER_DISMISS_KEY = 'sv_recover_dismissed';
-function recoverDismissed() { try { return sessionStorage.getItem(RECOVER_DISMISS_KEY) === '1'; } catch { return false; } }
-function dismissRecover() { try { sessionStorage.setItem(RECOVER_DISMISS_KEY, '1'); } catch {} }
+// The engine peeks the pre-crash candidate via GET_RECOVERY (available only when
+// some of those tabs aren't currently open). We surface the banner just then;
+// RECOVER_LAST commits it, DISMISS_RECOVERY clears it for this launch.
+const recovery = () => state.recovery || { available: false };
 
 // shelves = Unfiled + every folder, each with its sessions
 function shelves() {
@@ -172,15 +172,15 @@ function render() {
         </div>
       </div>
 
-      ${(!recoverDismissed()) ? `
+      ${recovery().available ? `
       <div class="recover-banner" id="recover-banner">
         <span class="rb-ico">↩</span>
         <div class="rb-text">
           <b>Did your browser close unexpectedly?</b>
-          <span class="rb-sub mono">Bring back the tabs you had open before — they're never lost.</span>
+          <span class="rb-sub mono">${recovery().missingCount} of ${recovery().tabCount} tabs from before aren't open — bring them back.</span>
         </div>
         <span style="flex:1"></span>
-        <button class="rb-do tactile" id="recover-do">↩ RECOVER TABS</button>
+        <button class="rb-do tactile" id="recover-do">↩ RECOVER ${recovery().missingCount} TABS</button>
         <button class="rb-x tactile" id="recover-x" title="Dismiss">×</button>
       </div>` : ''}
 
@@ -267,7 +267,7 @@ function wireDesk() {
   // crash-recovery banner
   const rdo = $('#recover-do'), rx = $('#recover-x');
   if (rdo) rdo.onclick = onRecover;
-  if (rx) rx.onclick = () => { dismissRecover(); render(); };
+  if (rx) rx.onclick = async () => { await api.dismissRecovery(); state.recovery = { available: false }; render(); toast('Recovery dismissed'); };
 
   // stack action buttons (don't start a drag)
   app.querySelectorAll('.actbtn').forEach((b) => {
@@ -360,14 +360,13 @@ async function onStackAct(act, id, viaDrop) {
 async function onRecover() {
   const btn = $('#recover-do'); if (btn) { btn.disabled = true; btn.textContent = '↩ RECOVERING…'; }
   try {
-    const s = await api.recoverLast();
-    dismissRecover();
+    const s = await api.recoverLast(); // clears the candidate in the engine
     if (s) {
       activeShelf = UNFILED;
-      await refresh();
+      await refresh(); // re-peeks recovery → banner goes away
       toast(`↩ recovered ${s.tabs.length} tabs into a new session`);
     } else {
-      render();
+      await refresh();
       toast('Nothing to recover — no snapshot from a previous session');
     }
   } catch (err) {

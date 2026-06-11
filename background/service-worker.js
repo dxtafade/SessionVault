@@ -15,7 +15,9 @@
  *   { action: 'GET_SESSION',       payload: { id } }                → { session }
  *   { action: 'GET_SETTINGS' }                                       → { settings }
  *   { action: 'UPDATE_SETTINGS',   payload: { ...partial } }        → { settings }
- *   { action: 'RECOVER_LAST',      payload: { name? } }             → { session | null }
+ *   { action: 'GET_RECOVERY' }                                       → { recovery: { available, tabCount, missingCount, savedAt } }  (peek, no side effects)
+ *   { action: 'DISMISS_RECOVERY' }                                   → { ok }   (hide the crash-recovery prompt)
+ *   { action: 'RECOVER_LAST',      payload: { name? } }             → { session | null }   (restores the pre-crash tabs)
  *   { action: 'EXPORT_SESSIONS' }                                    → { json }
  *   { action: 'IMPORT_SESSIONS',   payload: { json, mode? } }       → { imported, skipped }
  *   { action: 'SEARCH_SESSIONS',   payload: { query } }             → { results }
@@ -335,6 +337,11 @@ function enrichSearchHits(sessions, rawQuery) {
 // Not shown in the sessions list — only surfaced via RECOVER_LAST.
 
 const EMERGENCY_KEY = 'emergencySnapshot';
+// A frozen copy of the emergency snapshot taken at browser startup — i.e. the
+// tabs that were open just before this launch. The crash-recovery prompt reads
+// THIS (not the live, constantly-updated emergency snapshot), so it's stable and
+// surfaces at most once per launch. Cleared once recovered or dismissed.
+const RECOVERY_KEY = 'recoveryCandidate';
 
 async function updateEmergencySnapshot() {
   const tabs = await captureCurrentTabs();
@@ -342,6 +349,15 @@ async function updateEmergencySnapshot() {
   await chrome.storage.local.set({
     [EMERGENCY_KEY]: { tabs, savedAt: Date.now() },
   });
+}
+
+// On browser startup, freeze the previous session's tabs as the recovery
+// candidate BEFORE live tab events overwrite the emergency snapshot.
+async function captureRecoveryCandidate() {
+  const { [EMERGENCY_KEY]: snap } = await chrome.storage.local.get(EMERGENCY_KEY);
+  if (snap && Array.isArray(snap.tabs) && snap.tabs.length > 0) {
+    await chrome.storage.local.set({ [RECOVERY_KEY]: { tabs: snap.tabs, savedAt: snap.savedAt } });
+  }
 }
 
 chrome.tabs.onRemoved.addListener(() => updateEmergencySnapshot());
@@ -472,9 +488,36 @@ async function handleMessage({ action, payload = {} }) {
       return { settings };
     }
 
+    case 'GET_RECOVERY': {
+      // Peek (no side effects): does the crash-recovery prompt have anything to
+      // offer? Compares the frozen candidate against currently-open tabs so we
+      // don't nag when the browser already reopened everything.
+      const { [RECOVERY_KEY]: cand } = await chrome.storage.local.get(RECOVERY_KEY);
+      if (!cand || !cand.tabs?.length) {
+        return { recovery: { available: false, tabCount: 0, missingCount: 0, savedAt: null } };
+      }
+      const openUrls = new Set((await captureCurrentTabs()).map(t => t.url));
+      const missing = cand.tabs.filter(t => !openUrls.has(t.url));
+      return {
+        recovery: {
+          available: missing.length > 0,
+          tabCount: cand.tabs.length,
+          missingCount: missing.length,
+          savedAt: cand.savedAt,
+        },
+      };
+    }
+
+    case 'DISMISS_RECOVERY': {
+      await chrome.storage.local.remove(RECOVERY_KEY);
+      return { ok: true };
+    }
+
     case 'RECOVER_LAST': {
-      const data = await chrome.storage.local.get(EMERGENCY_KEY);
-      const snapshot = data[EMERGENCY_KEY];
+      // Prefer the frozen startup candidate (the pre-crash tabs); fall back to
+      // the live emergency snapshot so a manual "restore my last tabs" still works.
+      const data = await chrome.storage.local.get([RECOVERY_KEY, EMERGENCY_KEY]);
+      const snapshot = data[RECOVERY_KEY] ?? data[EMERGENCY_KEY];
       if (!snapshot) return { session: null };
 
       const now = Date.now();
@@ -487,6 +530,7 @@ async function handleMessage({ action, payload = {} }) {
         isAuto: false,
       };
       await saveSession(session);
+      await chrome.storage.local.remove(RECOVERY_KEY); // don't prompt again for this one
       return { session };
     }
 
@@ -834,7 +878,12 @@ async function bootstrap() {
 }
 
 chrome.runtime.onInstalled.addListener(bootstrap);
-chrome.runtime.onStartup.addListener(bootstrap);
+// On a real browser launch, freeze the pre-restart tabs as the recovery
+// candidate FIRST (before live tab events overwrite the snapshot), then boot.
+chrome.runtime.onStartup.addListener(async () => {
+  await captureRecoveryCandidate();
+  await bootstrap();
+});
 
 // ─── Toolbar click → open the full-page app ─────────────────────────────────────
 // The action has no default_popup, so clicking the toolbar icon fires this.

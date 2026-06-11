@@ -69,12 +69,18 @@ const { session } = await chrome.runtime.sendMessage({
   payload: { id, name: 'Optional custom name' }   // name is optional
 });
 
-// Recover from crash / emergency snapshot
-// Returns the recovered session (or null if no snapshot exists)
+// ── Crash recovery ──
+// Peek (no side effects) — drives the "did your browser crash?" prompt.
+// recovery: { available, tabCount, missingCount, savedAt }. Show the prompt when
+// `available` (there are pre-crash tabs not currently open).
+const { recovery } = await chrome.runtime.sendMessage({ action: 'GET_RECOVERY' });
+// User clicks "Restore" → re-creates the pre-crash tabs as a session:
 const { session } = await chrome.runtime.sendMessage({
   action: 'RECOVER_LAST',
   payload: { name: 'Optional custom name' }        // name is optional
 });
+// User dismisses the prompt (won't reappear this launch):
+await chrome.runtime.sendMessage({ action: 'DISMISS_RECOVERY' }); // → { ok }
 
 // Export all sessions as a JSON string (for download / backup)
 const { json } = await chrome.runtime.sendMessage({ action: 'EXPORT_SESSIONS' });

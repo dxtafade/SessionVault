@@ -54,7 +54,7 @@ Wired today: sessions, folders (create/move), trash, settings, stats, share,
 | Item | Status | Blocker? |
 |---|---|---|
 | Core session UX + sync panel | ✅ | — |
-| **Crash-recovery prompt** (`RECOVER_LAST`) — core "never lose" promise | ⬜ | **Option A & B** |
+| **Crash-recovery prompt** — engine ready (`GET_RECOVERY`/`DISMISS_RECOVERY`/`RECOVER_LAST`); UI banner pending (Lucik) | 🚧 | **Option A & B** |
 | Pro-gating UX: `GET_ENTITLEMENTS` counter, `FREE_LIMIT_REACHED` / `PRO_REQUIRED` prompts | ⬜ | **Option B** (A: just show the 50 counter) |
 | Folder rename/delete; full backup file export/import | ⬜ | 🔵 |
 | Smart folders, spaces, tags, archive, lock, rename/duplicate | ⬜ | Option B |

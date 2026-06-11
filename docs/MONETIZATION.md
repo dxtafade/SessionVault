@@ -88,6 +88,33 @@ Whatever the rail, the mechanic is the same and small:
 - Gate convenience/scale (sync, cross-device, long history, autosave) — never the
   free "never lose your tabs" safety net.
 
+## ⭐ Our actual path: Kazakhstan ИП (verified 2026-06)
+
+We can open a **Kazakhstan ИП** — and Kazakhstan is unsanctioned with real
+payment access a Russian entity lacks. Verified:
+
+- **Paddle supports Kazakhstan sellers** ([Paddle supported countries](https://www.paddle.com/help/start/intro-to-paddle/which-countries-are-supported-by-paddle)).
+  Paddle is a **Merchant of Record** — it handles worldwide VAT/sales tax, fraud,
+  and chargebacks, and pays out globally. With a KZ ИП this basically **solves
+  monetization** for a 3-person team. ~5%.
+- **Payoneer works in Kazakhstan** ([Payoneer KZ](https://www.payoneer.com/payments/kazakhstan/))
+  — multicurrency (USD/EUR) receiving account, easy to open, withdraw to a KZ
+  bank. Use it as the payout hub.
+- **Stripe is NOT available in Kazakhstan directly** — only via a US LLC
+  ([doola](https://www.doola.com/stripe-guide/how-to-open-a-stripe-account-in-kazakhstan/)).
+  So **ExtensionPay and Lemon Squeezy (both Stripe-based) are out** with a KZ
+  entity — drop them.
+- **Alternative:** local KZ acquirers (Freedom Pay, CloudPayments KZ, ePay/Halyk)
+  onboard a KZ ИП and accept international Visa/MC, settling to a KZ account — but
+  then **you** owe customers' taxes (Paddle removes that headache).
+- **Tax:** KZ ИП on the simplified regime (упрощёнка ~3% of turnover, or patent)
+  is cheap; with Paddle as MoR you only owe KZ tax on your income.
+
+**Recommended stack: KZ ИП → Paddle (checkout + subscriptions + tax) → payout to
+Payoneer / KZ bank.** Crypto gateway optional as a second rail. Integration:
+Paddle webhook → set `pro` in Supabase → `entitlements.js` becomes the real
+license check (`GET_ENTITLEMENTS` already exists).
+
 ## Recommendation for us (early stage)
 
 1. **If going global (likely):** the durable answer is a **foreign entity (US

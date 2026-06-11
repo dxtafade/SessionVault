@@ -614,13 +614,12 @@ async function renderSync() {
 function renderSyncError(msg) { const ov = $('#overlay-sync'); if (!ov) return; const m = ov.querySelector('.modal'); const e = document.createElement('div'); e.className = 'sync-err mono'; e.textContent = msg; m.appendChild(e); }
 function closeSync() { syncOpen = false; const ov = $('#overlay-sync'); if (ov) ov.remove(); }
 
-// ── onboarding (first run; 3 steps, replayable from settings) ───────────────────
+// ── onboarding (first run; scroll-driven narrative, replayable from settings) ────
+// UX from the SessionVault Prototype handoff (5 sections: hero · 3 steps · CTA,
+// scroll-snapped with word-by-word reveal + parallax art), reskinned to our
+// design language (manila cards, ink, Archivo/Space Mono).
 const ONB_KEY = 'sv_app_onboarded';
-const ONB_STEPS = [
-  { title: 'A thousand tabs.\nOne vault.', body: 'SessionVault collapses your open tabs into tidy sessions — and brings them back in one click. Let your browser breathe.' },
-  { title: 'Order finds\nitself.', body: 'Tags, search and folders. Drag sessions around the desk and file them into shelves like cards on a board.' },
-  { title: 'Everywhere\nyou go.', body: 'Sessions sync, end-to-end encrypted, across your devices. Home, work, on the road — your vault is always at hand.' },
-];
+const ONB_SECTIONS = 5;
 const ONB_TAGS = [
   { label: 'work', c: '#2D9D78', x: -120, y: -64, r: -10 },
   { label: 'research', c: '#3A86C8', x: 122, y: -48, r: 8 },
@@ -635,61 +634,110 @@ const DEV_GLYPHS = {
 };
 const CHECK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg>';
 
+// staggered word-reveal spans (\n → line break)
+function onbWords(text, base = 0, step = 60) {
+  let n = -1;
+  return text.split('\n').map((line) =>
+    `<span class="onb-wline">${line.split(' ').map((w) => { n++; return `<span class="onb-word" style="--d:${base + n * step}ms">${esc(w)}</span>`; }).join(' ')}</span>`,
+  ).join('');
+}
+
+function onbCard(i, mode) {
+  const d = i - 2;
+  const tf = mode === 'fan'
+    ? `translate(-50%,-50%) translate(${d * 58}px, ${Math.abs(d) * 12 - 18}px) rotate(${d * 9}deg)`
+    : `translate(-50%,-50%) translateY(${d * 8}px) scale(${1 - Math.abs(d) * 0.06})`;
+  const op = mode === 'fan' ? 1 : (i === 2 ? 1 : 0.5);
+  return `<div class="onb-card" style="transform:${tf};opacity:${op};z-index:${10 - Math.abs(d)}">
+    <div class="cstrip" style="background:${CARD_STRIPS[i]}"></div>
+    <div class="clines"><div class="onb-line a" style="background:${CARD_STRIPS[i]}"></div><div class="onb-line"></div><div class="onb-line" style="width:55%"></div></div>
+  </div>`;
+}
+function onbArt(kind) {
+  const mode = kind === 'fan' ? 'fan' : 'stack';
+  const cards = [0, 1, 2, 3, 4].map((i) => onbCard(i, mode)).join('');
+  let extra = '';
+  if (kind === 'tags') {
+    extra = `<div class="onb-layer">${ONB_TAGS.map((tg, i) => `<span class="onb-tag" style="color:${tg.c};border-color:color-mix(in srgb, ${tg.c} 45%, transparent);transform:translate(-50%,-50%) translate(${tg.x}px,${tg.y}px) rotate(${tg.r}deg);animation-delay:${150 + i * 90}ms"><span class="d" style="background:${tg.c}"></span>${tg.label}</span>`).join('')}</div>`;
+  } else if (kind === 'devices') {
+    extra = `<div class="onb-layer onb-devrow">${Object.keys(DEV_GLYPHS).map((k, i) => `<div class="onb-dev" style="animation-delay:${i * 110}ms"><div class="glyph">${DEV_GLYPHS[k]}</div><span class="onb-check">${CHECK}</span></div>`).join('')}</div>`;
+  }
+  return `<div class="onb-art"><div class="onb-art-inner">${cards}${extra}</div></div>`;
+}
+
 function renderOnboarding() {
   let ov = $('#overlay-onb');
-  if (!ov) { ov = document.createElement('div'); ov.id = 'overlay-onb'; ov.className = 'modal-center'; app.appendChild(ov); }
-  ov.innerHTML = `
-    <div class="modal onb-modal" style="transform:rotate(-.4deg)">
-      <div class="onb-wordmark">SESSIONVAULT</div>
-      <div class="onb-stage" id="onb-stage">
-        ${[0, 1, 2, 3, 4].map((i) => `
-          <div class="onb-card" data-i="${i}">
-            <div class="cstrip" style="background:${CARD_STRIPS[i]}"></div>
-            <div class="clines"><div class="onb-line a" style="background:${CARD_STRIPS[i]}"></div><div class="onb-line"></div><div class="onb-line" style="width:55%"></div></div>
-          </div>`).join('')}
-        <div class="onb-layer" id="onb-tags"></div>
-        <div class="onb-layer" id="onb-devices" style="display:flex;align-items:flex-end;justify-content:center;gap:26px;padding-bottom:6px"></div>
+  if (!ov) { ov = document.createElement('div'); ov.id = 'overlay-onb'; ov.className = 'onb-overlay'; app.appendChild(ov); }
+
+  const step = (num, title, body, art) => `
+    <div class="onb-sec onb-sec-step">
+      <div class="onb-step-text">
+        <div class="onb-num mono">${num}</div>
+        <h2 class="onb-h2">${onbWords(title, 180, 55)}</h2>
+        <p class="onb-sub onb-r" style="--d:420ms">${esc(body)}</p>
       </div>
-      <h2 class="onb-title" id="onb-title"></h2>
-      <p class="onb-body" id="onb-body"></p>
-      <div class="onb-foot">
-        <button class="onb-skip tactile" id="onb-skip">Skip</button>
-        <div class="onb-dots" id="onb-dots">${ONB_STEPS.map((_, i) => `<button class="onb-dot" data-step="${i}" aria-label="step ${i + 1}"></button>`).join('')}</div>
-        <button class="onb-next tactile" id="onb-next"></button>
-      </div>
+      <div class="onb-r onb-step-art" style="--d:260ms">${art}</div>
     </div>`;
+
+  ov.innerHTML = `
+    <div class="onb-track">
+      <div class="onb-stage">
+        <div class="onb-sec onb-sec-hero">
+          <div>
+            <div class="onb-micro mono onb-r" style="--d:0ms">SESSIONVAULT — TAB MANAGER</div>
+            <h1 class="onb-h1">${onbWords('A thousand tabs.\nOne vault.', 120, 75)}</h1>
+            <p class="onb-sub onb-r" style="--d:520ms; margin-inline:auto">SessionVault collapses your open tabs into tidy sessions — and brings them back in one click.</p>
+            <div class="onb-r" style="--d:680ms; margin-top:18px">${onbArt('fan')}</div>
+          </div>
+        </div>
+        ${step('01', 'One click — then silence', 'SessionVault collapses all your open tabs into tidy sessions — and brings them back in one click. Let your browser breathe.', onbArt('fan'))}
+        ${step('02', 'Order finds itself', 'Tags, search and folders. Drag sessions around the desk and file them into shelves like cards on a board.', onbArt('tags'))}
+        ${step('03', 'Everywhere you go', 'Sessions sync, end-to-end encrypted, across your devices. Home, work, on the road — your vault is always at hand.', onbArt('devices'))}
+        <div class="onb-sec onb-sec-cta">
+          <div class="onb-cta-inner">
+            <div class="onb-wordmark mono onb-r" style="--d:40ms">SESSIONVAULT</div>
+            <h2 class="onb-h1">${onbWords('Get started?', 140, 80)}</h2>
+            <button class="onb-next onb-r" id="onb-start" style="--d:480ms">Get started →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="onb-logo mono">SESSIONVAULT</div>
+    <button class="onb-skip" id="onb-skip">Skip</button>
+    <div class="onb-rail mono"><span id="onb-rail-cur">01</span><span class="bar"><i id="onb-rail-fill"></i></span><span>0${ONB_SECTIONS}</span></div>
+    <div class="onb-hint mono" id="onb-hint"><span class="line"></span> scroll to discover more</div>
+  `;
   ov.hidden = false;
 
-  let step = 0;
-  const cards = [...ov.querySelectorAll('.onb-card')];
-  const applyStep = (n) => {
-    step = n;
-    cards.forEach((el, i) => {
-      const d = i - 2;
-      if (step === 0) {
-        el.style.transform = `translate(${d * 64}px, ${Math.abs(d) * 14 - 22}px) rotate(${d * 9}deg)`;
-        el.style.opacity = '1';
-      } else {
-        el.style.transform = `translateY(${d * 9}px) scale(${1 - Math.abs(d) * 0.06})`;
-        el.style.opacity = i === 2 ? '1' : '.5';
-      }
+  const secs = [...ov.querySelectorAll('.onb-sec')];
+  const setActive = (n) => {
+    secs.forEach((el, i) => {
+      el.classList.toggle('active', i === n);
+      el.classList.toggle('off-above', i < n);
+      el.classList.toggle('off-below', i > n);
     });
-    $('#onb-tags', ov).innerHTML = step === 1
-      ? ONB_TAGS.map((tg, i) => `<span class="onb-tag" style="color:${tg.c};border-color:color-mix(in srgb, ${tg.c} 45%, transparent);transform:translate(-50%,-50%) translate(${tg.x}px,${tg.y}px) rotate(${tg.r}deg);animation-delay:${150 + i * 90}ms"><span class="d" style="background:${tg.c}"></span>${tg.label}</span>`).join('')
-      : '';
-    $('#onb-devices', ov).innerHTML = step === 2
-      ? Object.keys(DEV_GLYPHS).map((k, i) => `<div class="onb-dev" style="animation-delay:${i * 110}ms"><div class="glyph">${DEV_GLYPHS[k]}</div><span style="color:var(--sub)">${CHECK}</span></div>`).join('')
-      : '';
-    $('#onb-title', ov).textContent = ONB_STEPS[step].title;
-    $('#onb-body', ov).textContent = ONB_STEPS[step].body;
-    ov.querySelectorAll('.onb-dot').forEach((dt, i) => dt.classList.toggle('on', i === step));
-    $('#onb-next', ov).innerHTML = (step < 2 ? 'Next' : 'Get started') + ' →';
+    $('#onb-rail-cur', ov).textContent = String(Math.min(n + 1, ONB_SECTIONS)).padStart(2, '0');
+    $('#onb-rail-fill', ov).style.width = `${(n / (ONB_SECTIONS - 1)) * 100}%`;
+    $('#onb-hint', ov).style.opacity = n >= ONB_SECTIONS - 1 ? '0' : '1';
   };
 
-  applyStep(0);
+  const onScroll = () => {
+    const h = ov.clientHeight || 1;
+    setActive(Math.max(0, Math.min(ONB_SECTIONS - 1, Math.round(ov.scrollTop / h))));
+  };
+  const onMove = (e) => {
+    const x = (e.clientX / window.innerWidth - 0.5) * 2;
+    const y = (e.clientY / window.innerHeight - 0.5) * 2;
+    ov.style.setProperty('--par-x', `${x * 14}px`);
+    ov.style.setProperty('--par-y', `${y * 14}px`);
+  };
+  ov.addEventListener('scroll', onScroll, { passive: true });
+  ov.addEventListener('mousemove', onMove);
+  ov.scrollTop = 0; setActive(0);
+
   $('#onb-skip', ov).onclick = finishOnboarding;
-  $('#onb-next', ov).onclick = () => { step < 2 ? applyStep(step + 1) : finishOnboarding(); };
-  ov.querySelectorAll('.onb-dot').forEach((dt) => dt.onclick = () => applyStep(Number(dt.dataset.step)));
+  $('#onb-start', ov).onclick = finishOnboarding;
 }
 
 function finishOnboarding() {

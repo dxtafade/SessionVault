@@ -62,22 +62,29 @@ function savePos(shelfId, map) { try { localStorage.setItem('sv_app_pos:' + shel
 
 // ── state ───────────────────────────────────────────────────────────────────────
 let prefs = loadPrefs();
-let state = { folders: {}, sessions: {}, settings: {}, stats: null };
+let state = { folders: {}, sessions: {}, settings: {}, stats: null, entitlements: { pro: false }, limits: { freeSessionLimit: 50 } };
 let activeShelf = UNFILED;
 let query = '';
 let spreadId = null;     // session id shown in deal-out overlay
 let trashOpen = false;
 let settingsOpen = false;
 let syncOpen = false;
+let proOpen = false;     // upgrade / entitlements modal
 let syncMode = 'signin'; // 'signin' | 'signup'
 let syncPass = '';       // E2E passphrase, kept in memory only (never persisted)
 
 async function loadData() {
-  const [folders, sessions, settings, stats] = await Promise.all([
+  const [folders, sessions, settings, stats, ent] = await Promise.all([
     api.getFolders(), api.getSessions(), api.getSettings(), api.getStats().catch(() => null),
+    api.getEntitlements().catch(() => ({ entitlements: { pro: false }, limits: { freeSessionLimit: 50 } })),
   ]);
-  state = { folders, sessions, settings, stats };
+  state = { folders, sessions, settings, stats, entitlements: ent.entitlements, limits: ent.limits };
 }
+
+// ── entitlements helpers ────────────────────────────────────────────────────────
+const isPro = () => !!state.entitlements?.pro;
+const freeLimit = () => state.limits?.freeSessionLimit ?? 50;
+const savedCount = () => Object.keys(state.sessions).length;
 
 // shelves = Unfiled + every folder, each with its sessions
 function shelves() {

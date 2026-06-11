@@ -155,6 +155,8 @@ async function sendMock(action, payload = {}) {
       db.sync = { ...db.sync, state: 'idle', lastSync: now, error: null }; save(db); return { status: db.sync };
     }
     case 'ASSESS_PASSPHRASE': return { assessment: mockAssess(payload.passphrase) };
+    case 'GET_ENTITLEMENTS': return { entitlements: db.entitlements || { pro: false }, limits: { freeSessionLimit: 50 } };
+    case 'SET_PRO': db.entitlements = { pro: !!payload.pro }; save(db); return { entitlements: db.entitlements };
     default: throw new Error(`Unknown action: ${action}`);
   }
 }
@@ -185,3 +187,11 @@ export const getSyncStatus = async () => (await send('GET_SYNC_STATUS')).status 
 export const setSyncEnabled = async (enabled, credentials) => (await send('SET_SYNC_ENABLED', { enabled, credentials })).status ?? null;
 export const syncNow = async (passphrase) => (await send('SYNC_NOW', { passphrase })).status ?? null;
 export const assessPassphrase = async (passphrase) => (await send('ASSESS_PASSPHRASE', { passphrase })).assessment ?? null;
+
+// ── Entitlements (free vs Pro) — see docs/TIERS.md ──
+export const getEntitlements = async () => {
+  const r = await send('GET_ENTITLEMENTS');
+  return { entitlements: r.entitlements ?? { pro: false }, limits: r.limits ?? { freeSessionLimit: 50 } };
+};
+// Dev/stub toggle (no billing yet) — flip Pro to test the paid UI.
+export const setPro = async (pro) => { await send('SET_PRO', { pro }); return getEntitlements(); };

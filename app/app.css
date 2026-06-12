@@ -340,8 +340,8 @@ body { background: var(--desk, #E9E1D2); }
 .onb-card.scatter .onb-line { height: 5px; margin-top: 5px; }
 .onb-card.scatter .cstrip { height: 8px; }
 
-/* 01 — collect: scatter around the click zone, gather to centre when playing */
-.onb-art.onb-collect { height: 244px; }
+/* 01 — collect: scatter around the click zone, gather to centre on click */
+.onb-art.onb-collect { height: 244px; cursor: pointer; }
 .onb-collect .onb-card.scatter { left: var(--x); top: var(--y); transform: translate(-50%, -50%) rotate(var(--r)); }
 .onb-collect.playing .onb-card.scatter {
   left: 50%; top: 50%;

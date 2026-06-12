@@ -815,9 +815,20 @@ function renderOnboarding() {
       el.classList.toggle('active', i === n);
       el.classList.toggle('off-above', i < n);
       el.classList.toggle('off-below', i > n);
-      // play the section's art animation while it's the active step, reset on leave
+      // drive each section's art animation
       const art = el.querySelector('.onb-art');
-      if (art) art.classList.toggle('playing', i === n);
+      if (!art) return;
+      clearTimeout(art._playTimer);
+      if (i !== n) { art.classList.remove('playing'); return; }   // reset on leave
+      if (art.classList.contains('onb-collect')) {
+        art.classList.remove('playing');                         // 01: wait for the user to click
+      } else if (art.classList.contains('onb-sort')) {
+        art._playTimer = setTimeout(() => {                      // 02: auto-sort a beat after arriving
+          if (el.classList.contains('active')) art.classList.add('playing');
+        }, 900);
+      } else {
+        art.classList.add('playing');                            // 03 sync + hero: play immediately
+      }
     });
     $('#onb-rail-cur', ov).textContent = String(Math.min(n + 1, ONB_SECTIONS)).padStart(2, '0');
     $('#onb-rail-fill', ov).style.width = `${(n / (ONB_SECTIONS - 1)) * 100}%`;
@@ -837,6 +848,10 @@ function renderOnboarding() {
   ov.addEventListener('scroll', onScroll, { passive: true });
   ov.addEventListener('mousemove', onMove);
   ov.scrollTop = 0; setActive(0);
+
+  // 01 collect is click-driven: tapping the Click button / canvas gathers the tabs
+  const collectArt = ov.querySelector('.onb-collect');
+  if (collectArt) collectArt.onclick = () => collectArt.classList.toggle('playing');
 
   $('#onb-skip', ov).onclick = finishOnboarding;
   $('#onb-start', ov).onclick = finishOnboarding;

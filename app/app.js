@@ -434,7 +434,8 @@ function renderSpread() {
     <div class="mono" style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:.2em;color:var(--sub)">CLICK ANYWHERE TO RESTACK</div>
   `;
   ov.hidden = false;
-  ov.onclick = (e) => { if (!e.target.closest('[data-stop]')) closeSpread(); };
+  ov.onpointerdown = (e) => { ov._downSelf = (e.target === ov); };
+  ov.onclick = (e) => { if (ov._downSelf && !e.target.closest('[data-stop]')) closeSpread(); };
   ov.querySelectorAll('[data-sp]').forEach((b) => b.onclick = async () => {
     const a = b.dataset.sp;
     if (a === 'close') return closeSpread();
@@ -470,7 +471,8 @@ async function renderTrashOverlay() {
         </div>`).join('')}
     </div>`;
   ov.hidden = false;
-  ov.onclick = (e) => { if (!e.target.closest('[data-stop]')) closeTrash(); };
+  ov.onpointerdown = (e) => { ov._downSelf = (e.target === ov); };
+  ov.onclick = (e) => { if (ov._downSelf && !e.target.closest('[data-stop]')) closeTrash(); };
   ov.querySelectorAll('[data-tr]').forEach((b) => b.onclick = async () => {
     if (b.dataset.tr === 'close') return closeTrash();
     if (b.dataset.tr === 'empty') { await api.emptyTrash(); renderTrashOverlay(); toast('Bin emptied'); }
@@ -510,7 +512,8 @@ function renderSettings() {
       <div class="set-row"><div class="label"><div class="l">Keep autosaves</div><div class="h mono">How many snapshots to retain</div></div><input class="num mono" id="set-maxauto" type="number" min="1" max="100" value="${esc(s.maxAutoSessions ?? 5)}" /></div>
     </div>`;
   ov.hidden = false;
-  ov.onclick = (e) => { if (e.target === ov) closeSettings(); };
+  ov.onpointerdown = (e) => { ov._downSelf = (e.target === ov); };
+  ov.onclick = (e) => { if (ov._downSelf && e.target === ov) closeSettings(); };
   $('[data-done]', ov).onclick = closeSettings;
   $('[data-replay]', ov).onclick = () => { closeSettings(); renderOnboarding(); };
   ov.querySelectorAll('[data-seg]').forEach((b) => b.onclick = () => { prefs[b.dataset.seg] = b.dataset.val; savePrefs(); applyPrefs(); renderSettings(); });
@@ -592,7 +595,8 @@ async function renderSync() {
       ${body}
     </div>`;
   ov.hidden = false;
-  ov.onclick = (e) => { if (e.target === ov) closeSync(); };
+  ov.onpointerdown = (e) => { ov._downSelf = (e.target === ov); };
+  ov.onclick = (e) => { if (ov._downSelf && e.target === ov) closeSync(); };
   $('[data-done]', ov).onclick = closeSync;
 
   if (!status.enabled) {

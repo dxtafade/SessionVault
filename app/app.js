@@ -701,6 +701,65 @@ function onbArt(kind) {
   return `<div class="onb-art"><div class="onb-art-inner">${cards}${extra}</div></div>`;
 }
 
+// cursor pointer model (restyled to ink/paper) for the collect scene
+const CURSOR_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3 L18 11.5 L12.5 12.8 L15.4 19.2 L12.8 20.4 L9.9 14 L6 17 Z" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+
+// one small "tab card" — same manila/ink look as .onb-card, smaller, var-positioned
+function onbMiniCard(color, vars, cls = '') {
+  return `<div class="onb-card scatter ${cls}" style="${vars}">
+    <div class="cstrip" style="background:${color}"></div>
+    <div class="clines"><div class="onb-line a" style="background:${color}"></div><div class="onb-line"></div><div class="onb-line" style="width:55%"></div></div>
+  </div>`;
+}
+
+// ── 01: tabs scattered around a "Click" zone → gather into a stack when active ──
+function onbArtCollect() {
+  const spots = [[20, 16, -9], [52, 9, 6], [82, 20, -4], [88, 49, 8], [78, 83, -7], [48, 92, 3], [16, 73, 7], [12, 44, -6]];
+  const cards = spots.map(([x, y, r], i) =>
+    onbMiniCard(CARD_STRIPS[i % CARD_STRIPS.length],
+      `--x:${x}%;--y:${y}%;--r:${r}deg;--i:${i - 3.5};--d:${i * 40}ms;z-index:${i}`)).join('');
+  return `<div class="onb-art onb-collect">
+    <div class="onb-art-inner">
+      ${cards}
+      <div class="onb-clickzone"><span class="halo"></span><span class="zlabel mono">CLICK</span></div>
+      <span class="onb-cursor">${CURSOR_SVG}</span>
+      <div class="onb-collected mono"><span class="onb-check">${CHECK}</span>collected</div>
+    </div></div>`;
+}
+
+// ── 02: scattered cards auto-sort into two tag groups when active ──
+function onbArtSort() {
+  const A = '#2D9D78', B = '#3A86C8';
+  // each card: scatter (--sx/--sy/--r) → group column (--gx/--gy)
+  const cards = [
+    { c: A, s: [8, 14, -7], g: [27, 40] }, { c: B, s: [60, 8, 6], g: [73, 40] },
+    { c: A, s: [82, 22, -4], g: [27, 62] }, { c: B, s: [14, 64, 6], g: [73, 62] },
+    { c: A, s: [50, 78, -5], g: [27, 84] }, { c: B, s: [80, 60, 8], g: [73, 84] },
+  ].map((cd, i) => onbMiniCard(cd.c,
+    `--sx:${cd.s[0]}%;--sy:${cd.s[1]}%;--r:${cd.s[2]}deg;--gx:${cd.g[0]}%;--gy:${cd.g[1]}%;--d:${i * 50}ms;z-index:${i}`,
+    'sortable')).join('');
+  const tags = [{ c: A, x: 27, k: 'work' }, { c: B, x: 73, k: 'research' }].map((g, i) =>
+    `<span class="onb-tag onb-sort-tag" style="left:${g.x}%;top:6%;color:${g.c};border-color:color-mix(in srgb, ${g.c} 45%, transparent);--d:${350 + i * 80}ms"><span class="d" style="background:${g.c}"></span>${g.k}</span>`).join('');
+  return `<div class="onb-art onb-sort">
+    <div class="onb-art-inner">${tags}${cards}</div></div>`;
+}
+
+// ── 03: hub breathes, sync dots travel to devices, tiles bump on arrival ──
+function onbArtSync() {
+  const cx = 190, cy = 44;
+  const devs = [{ k: 'laptop', left: 52, top: 170 }, { k: 'desktop', left: 163, top: 180 }, { k: 'phone', left: 274, top: 170 }];
+  const ctr = (d) => [d.left + 27, d.top + 27];
+  const lines = devs.map((d) => { const [x, y] = ctr(d); return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--paperEdge)" stroke-width="1.5" stroke-dasharray="5 6"/>`; }).join('');
+  const dots = devs.map((d, i) => { const [x, y] = ctr(d); return `<span class="onb-syncdot" style="--tx:${x - cx}px;--ty:${y - cy}px;--delay:${i * 0.55}s"></span>`; }).join('');
+  const tiles = devs.map((d, i) => `<div class="onb-syncdev" style="left:${d.left}px;top:${d.top}px;--delay:${i * 0.55}s">${DEV_GLYPHS[d.k]}</div>`).join('');
+  return `<div class="onb-art onb-sync">
+    <div class="onb-art-inner">
+      <svg class="onb-sync-lines" viewBox="0 0 380 240" width="380" height="240" aria-hidden="true">${lines}</svg>
+      <div class="onb-synchub"><span class="pulse"></span><span class="hub-mark mono">SV</span></div>
+      ${dots}${tiles}
+    </div></div>`;
+}
+
 function renderOnboarding() {
   let ov = $('#overlay-onb');
   if (!ov) { ov = document.createElement('div'); ov.id = 'overlay-onb'; ov.className = 'onb-overlay'; app.appendChild(ov); }
@@ -726,9 +785,9 @@ function renderOnboarding() {
             <div class="onb-r" style="--d:680ms; margin-top:18px">${onbArt('fan')}</div>
           </div>
         </div>
-        ${step('01', 'One click — then silence', 'SessionVault collapses all your open tabs into tidy sessions — and brings them back in one click. Let your browser breathe.', onbArt('fan'))}
-        ${step('02', 'Order finds itself', 'Tags, search and folders. Drag sessions around the desk and file them into shelves like cards on a board.', onbArt('tags'))}
-        ${step('03', 'Everywhere you go', 'Sessions sync, end-to-end encrypted, across your devices. Home, work, on the road — your vault is always at hand.', onbArt('devices'))}
+        ${step('01', 'One click — then silence', 'SessionVault collapses all your open tabs into tidy sessions — and brings them back in one click. Let your browser breathe.', onbArtCollect())}
+        ${step('02', 'Order finds itself', 'Tags, search and folders. Drag sessions around the desk and file them into shelves like cards on a board.', onbArtSort())}
+        ${step('03', 'Everywhere you go', 'Sessions sync, end-to-end encrypted, across your devices. Home, work, on the road — your vault is always at hand.', onbArtSync())}
         <div class="onb-sec onb-sec-cta">
           <div class="onb-cta-inner">
             <div class="onb-wordmark mono onb-r" style="--d:40ms">SESSIONVAULT</div>
@@ -752,6 +811,9 @@ function renderOnboarding() {
       el.classList.toggle('active', i === n);
       el.classList.toggle('off-above', i < n);
       el.classList.toggle('off-below', i > n);
+      // play the section's art animation while it's the active step, reset on leave
+      const art = el.querySelector('.onb-art');
+      if (art) art.classList.toggle('playing', i === n);
     });
     $('#onb-rail-cur', ov).textContent = String(Math.min(n + 1, ONB_SECTIONS)).padStart(2, '0');
     $('#onb-rail-fill', ov).style.width = `${(n / (ONB_SECTIONS - 1)) * 100}%`;

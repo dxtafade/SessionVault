@@ -564,7 +564,11 @@ async function renderSync() {
       <div class="set-section mono">${syncMode === 'signup' ? 'CREATE ACCOUNT' : 'SIGN IN'}</div>
       ${confirmBlock}
       <input id="sync-email" class="sync-input mono" type="email" placeholder="email" autocomplete="username" value="${esc(syncEmail)}" />
-      <input id="sync-pw" class="sync-input mono" type="password" placeholder="password" autocomplete="current-password" />
+      <div class="sync-pw-wrap">
+        <input id="sync-pw" class="sync-input mono has-reveal" type="password" placeholder="password" autocomplete="current-password" />
+        <button type="button" class="pw-reveal" id="sync-pw-reveal" aria-label="Show password" title="Show password">${EYE_SHOW}</button>
+      </div>
+      <div class="sync-warn mono" id="sync-pw-warn" hidden>Use only English letters, numbers and symbols — no accented or non-Latin characters.</div>
       ${errLine}
       <button class="btn-squash tactile" id="sync-connect" style="width:100%;margin-top:12px;transform:none">
         ${syncMode === 'signup' ? 'CREATE ACCOUNT & CONNECT' : 'SIGN IN & CONNECT'}
@@ -602,6 +606,21 @@ async function renderSync() {
   if (!status.enabled) {
     $('#sync-email', ov).oninput = (e) => { syncEmail = e.target.value; };
     $('#sync-toggle', ov).onclick = () => { syncMode = syncMode === 'signup' ? 'signin' : 'signup'; confirmEmail = null; renderSync(); };
+
+    // password: reveal toggle + non-ASCII guard
+    const pw = $('#sync-pw', ov);
+    const pwWarn = $('#sync-pw-warn', ov);
+    const reveal = $('#sync-pw-reveal', ov);
+    reveal.onclick = () => {
+      const show = pw.type === 'password';
+      pw.type = show ? 'text' : 'password';
+      reveal.innerHTML = show ? EYE_HIDE : EYE_SHOW;
+      reveal.title = reveal.ariaLabel = show ? 'Hide password' : 'Show password';
+      pw.focus();
+    };
+    const checkPw = () => pwWarn.hidden = !hasNonAscii(pw.value);
+    pw.oninput = checkPw;
+
     const resend = $('#sync-resend', ov);
     if (resend) resend.onclick = async () => {
       resend.disabled = true; resend.textContent = '↻ Sending…';
@@ -613,6 +632,7 @@ async function renderSync() {
       const email = $('#sync-email', ov).value.trim();
       const password = $('#sync-pw', ov).value;
       if (!email || !password) return toast('Enter email and password');
+      if (hasNonAscii(password)) { pwWarn.hidden = false; pw.focus(); return; }
       syncEmail = email;
       try {
         await api.setSyncEnabled(true, { email, password, signUp: syncMode === 'signup' });
@@ -675,6 +695,11 @@ const DEV_GLYPHS = {
 const CHECK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg>';
 // stacked-documents glyph for the sync hub — same line-art weight as DEV_GLYPHS
 const DOC_GLYPH = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="11" height="14" rx="2"/><path d="M5 7v11a2 2 0 0 0 2 2h8"/></svg>';
+// password reveal glyphs (eye / eye-off)
+const EYE_SHOW = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_HIDE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 10.6a3 3 0 0 0 4.2 4.2"/><path d="M9.9 5.2A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-3.3 4.1"/><path d="M6.6 6.6A17.5 17.5 0 0 0 2 12s3.5 7 10 7a10.3 10.3 0 0 0 3.7-.7"/></svg>';
+// allowed = printable ASCII only; flag accented/non-Latin/control characters
+const hasNonAscii = (s) => /[^\x20-\x7E]/.test(s || '');
 
 // staggered word-reveal spans (\n → line break)
 function onbWords(text, base = 0, step = 60) {

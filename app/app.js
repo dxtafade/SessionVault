@@ -560,22 +560,27 @@ async function renderSync() {
           <button class="si-resend mono" id="sync-resend">↻ Resend email</button>
         </div>
       </div>` : '';
+    const isSignup = syncMode === 'signup';
+    // Sign-up only: confirm the password to catch typos before the account exists.
+    const confirmPwInput = isSignup ? `
+      <input id="sync-pw2" class="sync-input mono" type="password" placeholder="confirm password" autocomplete="new-password" />` : '';
     body = `
-      <div class="set-section mono">${syncMode === 'signup' ? 'CREATE ACCOUNT' : 'SIGN IN'}</div>
+      <div class="set-section mono">${isSignup ? 'CREATE ACCOUNT' : 'SIGN IN'}</div>
       ${confirmBlock}
       <input id="sync-email" class="sync-input mono" type="email" placeholder="email" autocomplete="username" value="${esc(syncEmail)}" />
       <div class="sync-pw-wrap">
-        <input id="sync-pw" class="sync-input mono has-reveal" type="password" placeholder="password" autocomplete="current-password" />
+        <input id="sync-pw" class="sync-input mono has-reveal" type="password" placeholder="password" autocomplete="${isSignup ? 'new-password' : 'current-password'}" />
         <button type="button" class="pw-reveal" id="sync-pw-reveal" aria-label="Show password" title="Show password">${EYE_SHOW}</button>
       </div>
       <div class="sync-warn mono" id="sync-pw-warn" hidden>Use only English letters, numbers and symbols — no spaces, accents or non-Latin characters.</div>
+      ${confirmPwInput}
       ${errLine}
       <button class="btn-squash tactile" id="sync-connect" style="width:100%;margin-top:12px;transform:none">
-        ${syncMode === 'signup' ? 'CREATE ACCOUNT & CONNECT' : 'SIGN IN & CONNECT'}
+        ${isSignup ? 'CREATE ACCOUNT & CONNECT' : 'SIGN IN & CONNECT'}
       </button>
       <div class="sync-foot mono">
-        ${syncMode === 'signup' ? 'Have an account?' : 'New here?'}
-        <button class="sync-link" id="sync-toggle">${syncMode === 'signup' ? 'Sign in' : 'Create one'}</button>
+        ${isSignup ? 'Have an account?' : 'New here?'}
+        <button class="sync-link" id="sync-toggle">${isSignup ? 'Sign in' : 'Create one'}</button>
       </div>
       <div class="sync-foot mono" style="opacity:.6">End-to-end encrypted. Your passphrase never leaves this device.</div>`;
   } else {
@@ -633,6 +638,11 @@ async function renderSync() {
       const password = $('#sync-pw', ov).value;
       if (!email || !password) return toast('Enter email and password');
       if (hasBadChar(password)) { pwWarn.hidden = false; pw.focus(); return; }
+      if (syncMode === 'signup') {
+        // Confirm-password guard: catch typos before the account is created.
+        if (password.length < 6) return toast('Password must be at least 6 characters');
+        if (password !== $('#sync-pw2', ov).value) return toast('Passwords don’t match');
+      }
       syncEmail = email;
       try {
         await api.setSyncEnabled(true, { email, password, signUp: syncMode === 'signup' });

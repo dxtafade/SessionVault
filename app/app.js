@@ -568,7 +568,7 @@ async function renderSync() {
         <input id="sync-pw" class="sync-input mono has-reveal" type="password" placeholder="password" autocomplete="current-password" />
         <button type="button" class="pw-reveal" id="sync-pw-reveal" aria-label="Show password" title="Show password">${EYE_SHOW}</button>
       </div>
-      <div class="sync-warn mono" id="sync-pw-warn" hidden>Use only English letters, numbers and symbols — no accented or non-Latin characters.</div>
+      <div class="sync-warn mono" id="sync-pw-warn" hidden>Use only English letters, numbers and symbols — no spaces, accents or non-Latin characters.</div>
       ${errLine}
       <button class="btn-squash tactile" id="sync-connect" style="width:100%;margin-top:12px;transform:none">
         ${syncMode === 'signup' ? 'CREATE ACCOUNT & CONNECT' : 'SIGN IN & CONNECT'}
@@ -618,7 +618,7 @@ async function renderSync() {
       reveal.title = reveal.ariaLabel = show ? 'Hide password' : 'Show password';
       pw.focus();
     };
-    const checkPw = () => pwWarn.hidden = !hasNonAscii(pw.value);
+    const checkPw = () => pwWarn.hidden = !hasBadChar(pw.value);
     pw.oninput = checkPw;
 
     const resend = $('#sync-resend', ov);
@@ -632,7 +632,7 @@ async function renderSync() {
       const email = $('#sync-email', ov).value.trim();
       const password = $('#sync-pw', ov).value;
       if (!email || !password) return toast('Enter email and password');
-      if (hasNonAscii(password)) { pwWarn.hidden = false; pw.focus(); return; }
+      if (hasBadChar(password)) { pwWarn.hidden = false; pw.focus(); return; }
       syncEmail = email;
       try {
         await api.setSyncEnabled(true, { email, password, signUp: syncMode === 'signup' });
@@ -698,8 +698,8 @@ const DOC_GLYPH = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" s
 // password reveal glyphs (eye / eye-off)
 const EYE_SHOW = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYE_HIDE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 10.6a3 3 0 0 0 4.2 4.2"/><path d="M9.9 5.2A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-3.3 4.1"/><path d="M6.6 6.6A17.5 17.5 0 0 0 2 12s3.5 7 10 7a10.3 10.3 0 0 0 3.7-.7"/></svg>';
-// allowed = printable ASCII only; flag accented/non-Latin/control characters
-const hasNonAscii = (s) => /[^\x20-\x7E]/.test(s || '');
+// allowed = printable ASCII except space; flag spaces, accented/non-Latin & control chars
+const hasBadChar = (s) => /[^\x21-\x7E]/.test(s || '');
 
 // staggered word-reveal spans (\n → line break)
 function onbWords(text, base = 0, step = 60) {

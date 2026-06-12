@@ -673,6 +673,8 @@ const DEV_GLYPHS = {
   phone: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>',
 };
 const CHECK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg>';
+// stacked-documents glyph for the sync hub — same line-art weight as DEV_GLYPHS
+const DOC_GLYPH = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="11" height="14" rx="2"/><path d="M5 7v11a2 2 0 0 0 2 2h8"/></svg>';
 
 // staggered word-reveal spans (\n → line break)
 function onbWords(text, base = 0, step = 60) {
@@ -759,7 +761,7 @@ function onbArtSync() {
   return `<div class="onb-art onb-sync">
     <div class="onb-art-inner">
       <svg class="onb-sync-lines" viewBox="0 0 380 240" width="380" height="240" aria-hidden="true">${lines}</svg>
-      <div class="onb-synchub"><span class="pulse"></span><span class="hub-mark mono">SV</span></div>
+      <div class="onb-synchub"><span class="pulse"></span><span class="hub-mark">${DOC_GLYPH}</span></div>
       ${dots}${tiles}
     </div></div>`;
 }
@@ -837,7 +839,8 @@ function renderOnboarding() {
 
   const onScroll = () => {
     const h = ov.clientHeight || 1;
-    setActive(Math.max(0, Math.min(ONB_SECTIONS - 1, Math.round(ov.scrollTop / h))));
+    const step = h * 0.5; // 50vh per section — matches the 300vh .onb-track (2× faster)
+    setActive(Math.max(0, Math.min(ONB_SECTIONS - 1, Math.round(ov.scrollTop / step))));
   };
   const onMove = (e) => {
     const x = (e.clientX / window.innerWidth - 0.5) * 2;

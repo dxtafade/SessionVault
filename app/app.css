@@ -272,7 +272,9 @@ body { background: var(--desk, #E9E1D2); }
 
 /* onboarding — scroll-driven narrative (first run; replayable from settings) */
 .onb-overlay { position: fixed; inset: 0; z-index: 120; background: var(--desk); color: var(--ink); overflow-y: auto; overflow-x: hidden; --par-x: 0px; --par-y: 0px; }
-.onb-track { height: 500vh; position: relative; }
+/* 5 sections at 50vh of scroll each (+100vh sticky stage) — half the wheel
+   distance per step, so advancing between titles is ~2× faster */
+.onb-track { height: 300vh; position: relative; }
 .onb-stage { position: sticky; top: 0; height: 100vh; overflow: hidden; }
 .onb-sec {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 8vw;
@@ -390,7 +392,7 @@ body { background: var(--desk, #E9E1D2); }
   background: var(--paper); border: 2px solid var(--ink); box-shadow: var(--shadow);
   display: flex; align-items: center; justify-content: center;
 }
-.onb-synchub .hub-mark { font-size: 14px; letter-spacing: .04em; font-weight: 700; color: var(--ink); }
+.onb-synchub .hub-mark { display: flex; align-items: center; justify-content: center; color: var(--ink); }
 .onb-synchub .pulse { position: absolute; inset: -2px; border-radius: 50%; border: 1.5px solid var(--ink); opacity: 0; }
 .onb-sync.playing .onb-synchub { animation: onb-hub-breathe 4s ease-in-out infinite; }
 .onb-sync.playing .onb-synchub .pulse { animation: onb-halo 2.4s ease-out infinite; }

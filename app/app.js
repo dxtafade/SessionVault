@@ -152,7 +152,7 @@ function render() {
             <span class="dot" style="background:${esc(sh.color)}"></span>${esc(sh.name)}
             <span class="count mono">${sh.sessions.length}</span>
           </button>`).join('')}
-        <button class="tab-add mono" id="add-folder" title="New shelf">＋</button>
+        <button class="tab-add" id="add-folder" title="New shelf">+</button>
       </div>
       <button class="rail-arrow tactile" id="flip-next" title="Next shelf">›</button>
     </div>

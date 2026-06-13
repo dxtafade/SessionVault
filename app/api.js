@@ -165,6 +165,7 @@ async function sendMock(action, payload = {}) {
     }
     case 'ASSESS_PASSPHRASE': return { assessment: mockAssess(payload.passphrase) };
     case 'RESEND_CONFIRMATION': return { ok: true }; // preview stub — no real email sent
+    case 'RECOVER_PASSWORD': return { ok: true };    // preview stub — no real email sent
     case 'GET_RECOVERY': {
       // Peek, no side effects (the preview can't see real open tabs, so the
       // whole candidate counts as "missing").
@@ -217,6 +218,9 @@ export const assessPassphrase = async (passphrase) => (await send('ASSESS_PASSPH
 // action (Supabase /auth/v1/resend lives behind the anon key in background/);
 // until that lands the real path throws and the UI shows a friendly fallback.
 export const resendConfirmation = async (email) => { await send('RESEND_CONFIRMATION', { type: 'signup', email }); };
+// Send a password-reset email for a forgotten account password (Supabase
+// /auth/v1/recover behind the engine). The user sets a new password via the link.
+export const recoverPassword = async (email) => { await send('RECOVER_PASSWORD', { email }); };
 
 // ── Crash recovery ──
 // Peek (no side effects): { available, tabCount, missingCount, savedAt }.

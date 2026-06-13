@@ -86,6 +86,7 @@
  *   Cloud sync (paid, stubbed):
  *   { action: 'GET_SYNC_STATUS' }                                    → { status }
  *   { action: 'SET_SYNC_ENABLED', payload: { enabled, credentials?: { email, password } } } → { status }   (enabled:true signs in)
+ *   { action: 'RECOVER_PASSWORD', payload: { email } }              → { ok }   (sends a Supabase password-reset email)
  *   { action: 'SYNC_NOW',         payload: { passphrase? } }        → { status }   (syncs full vault; passphrase = E2E key, never persisted)
  *   { action: 'ASSESS_PASSPHRASE', payload: { passphrase } }        → { assessment }  ({ score, label, acceptable, warnings })
  *
@@ -838,6 +839,13 @@ async function handleMessage({ action, payload = {} }) {
         ? await sync.enable(payload.credentials)
         : await sync.disable();
       return { status };
+    }
+
+    case 'RECOVER_PASSWORD': {
+      // Forgot the account password — send a Supabase reset email. No auth/state
+      // change here; the user sets a new password via the emailed link.
+      await sync.recoverPassword(payload.email);
+      return { ok: true };
     }
 
     case 'SYNC_NOW': {

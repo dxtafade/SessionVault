@@ -70,10 +70,12 @@ body { background: var(--desk, #E9E1D2); }
 .tab .dot { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
 .tab .count { font-size: 9px; color: var(--sub); font-weight: 400; }
 .tab-add {
-  height: 32px; padding: 0 14px; border: 2px dashed var(--ink); border-bottom: none;
-  border-radius: 12px 12px 0 0; background: transparent; color: var(--sub);
-  cursor: pointer; font-size: 13px; letter-spacing: .08em; flex: 0 0 auto;
+  height: 32px; padding: 0 16px; border: 2px solid var(--ink); border-bottom: none;
+  border-radius: 12px 12px 0 0; background: var(--paper); color: var(--ink);
+  cursor: pointer; font-size: 18px; line-height: 1; font-weight: 700; flex: 0 0 auto;
+  display: flex; align-items: center; transition: background .2s var(--spring), color .2s;
 }
+.tab-add:hover { background: var(--deskHi); }
 .tab-input {
   height: 32px; width: 140px; border: 2px dashed var(--ink); border-bottom: none;
   border-radius: 12px 12px 0 0; background: var(--paper); color: var(--ink);

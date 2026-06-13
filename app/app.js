@@ -74,6 +74,7 @@ let syncMode = 'signin'; // 'signin' | 'signup'
 let syncPass = '';       // E2E passphrase, kept in memory only (never persisted)
 let syncEmail = '';      // remembered email — prefilled across sign-in/up renders
 let confirmEmail = null; // when set, show the "confirm your email" success state
+let resetSentEmail = null; // when set, show the "password reset link sent" state
 
 async function loadData() {
   const [folders, sessions, settings, stats, ent, recovery] = await Promise.all([
@@ -560,16 +561,39 @@ async function renderSync() {
           <button class="si-resend mono" id="sync-resend">↻ Resend email</button>
         </div>
       </div>` : '';
+    // Forgot-password success: Supabase accepted the reset request and (if the
+    // account exists) emailed a link. Friendly, non-red — mirrors confirmBlock.
+    const resetBlock = resetSentEmail ? `
+      <div class="sync-info">
+        <span class="si-ico">🔑</span>
+        <div class="si-text">
+          <b>Check your inbox</b>
+          <span class="si-body">We sent a password-reset link to <b>${esc(resetSentEmail)}</b>. Open it to set a new password, then sign in here.</span>
+          <span class="si-hint mono">No email? Check Spam — and make sure it's the address you signed up with.</span>
+        </div>
+      </div>` : '';
     const isSignup = syncMode === 'signup';
     // Sign-up only: confirm the password to catch typos before the account exists.
+    // Always in the DOM (so it can animate); revealed once the password is typed.
     const confirmPwInput = isSignup ? `
-      <input id="sync-pw2" class="sync-input mono" type="password" placeholder="confirm password" autocomplete="new-password" />` : '';
+      <div class="pw2-wrap" id="pw2-wrap">
+        <div class="pw2-inner">
+          <input id="sync-pw2" class="sync-input mono" type="password" placeholder="confirm password" autocomplete="new-password" />
+        </div>
+      </div>` : '';
+    // Sign-in only: a way out when the account password is forgotten.
+    const forgotLink = !isSignup ? `
+      <div class="sync-foot mono" style="margin-top:8px">
+        <button class="sync-link" id="sync-forgot">Forgot password?</button>
+      </div>` : '';
     body = `
       <div class="set-section mono">${isSignup ? 'CREATE ACCOUNT' : 'SIGN IN'}</div>
       ${confirmBlock}
+      ${resetBlock}
       <input id="sync-email" class="sync-input mono" type="email" placeholder="email" autocomplete="username" value="${esc(syncEmail)}" />
       <input id="sync-pw" class="sync-input mono" type="password" placeholder="password" autocomplete="${isSignup ? 'new-password' : 'current-password'}" />
       ${confirmPwInput}
+      ${forgotLink}
       ${errLine}
       <button class="btn-squash tactile" id="sync-connect" style="width:100%;margin-top:12px;transform:none">
         ${isSignup ? 'CREATE ACCOUNT & CONNECT' : 'SIGN IN & CONNECT'}
@@ -606,7 +630,29 @@ async function renderSync() {
 
   if (!status.enabled) {
     $('#sync-email', ov).oninput = (e) => { syncEmail = e.target.value; };
-    $('#sync-toggle', ov).onclick = () => { syncMode = syncMode === 'signup' ? 'signin' : 'signup'; confirmEmail = null; renderSync(); };
+    // Sign-up: slide the "confirm password" field in once the password is typed.
+    const pw1 = $('#sync-pw', ov), pw2wrap = $('#pw2-wrap', ov);
+    if (pw2wrap) {
+      const revealPw2 = () => pw2wrap.classList.toggle('show', pw1.value.length > 0);
+      pw1.oninput = revealPw2;
+      revealPw2(); // handle re-renders where the password is already filled
+    }
+    $('#sync-toggle', ov).onclick = () => { syncMode = syncMode === 'signup' ? 'signin' : 'signup'; confirmEmail = null; resetSentEmail = null; renderSync(); };
+    const forgot = $('#sync-forgot', ov);
+    if (forgot) forgot.onclick = async () => {
+      const email = $('#sync-email', ov).value.trim();
+      if (!email) return toast('Enter your email first');
+      syncEmail = email;
+      forgot.disabled = true; forgot.textContent = 'Sending…';
+      try {
+        await api.recoverPassword(email);
+        confirmEmail = null; resetSentEmail = email;
+        renderSync();
+      } catch (err) {
+        toast(String(err.message).replace(/^AUTH_FAILED:\s*/, '') || 'Could not send reset email');
+        forgot.disabled = false; forgot.textContent = 'Forgot password?';
+      }
+    };
     const resend = $('#sync-resend', ov);
     if (resend) resend.onclick = async () => {
       resend.disabled = true; resend.textContent = '↻ Sending…';
@@ -626,7 +672,7 @@ async function renderSync() {
       syncEmail = email;
       try {
         await api.setSyncEnabled(true, { email, password, signUp: syncMode === 'signup' });
-        confirmEmail = null;
+        confirmEmail = null; resetSentEmail = null;
         toast('☁ connected');
         renderSync();
       } catch (err) {

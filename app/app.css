@@ -240,6 +240,14 @@ body { background: var(--desk, #E9E1D2); }
 /* cloud sync panel */
 .sync-input { width: 100%; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 8px; background: var(--paper); color: var(--ink); font-size: 13px; margin-top: 10px; outline: none; }
 .sync-input:focus { box-shadow: 2px 2px 0 var(--sub); }
+/* confirm-password: collapsed until the password field has a value, then slides in.
+   grid-template-rows 0fr→1fr animates to the field's REAL height, so the easing maps
+   to the actual motion (smoother than max-height, which overshoots into dead space). */
+.pw2-wrap { display: grid; grid-template-rows: 0fr; opacity: 0;
+  transition: grid-template-rows .42s cubic-bezier(.22, .61, .36, 1), opacity .32s ease; }
+.pw2-wrap.show { grid-template-rows: 1fr; opacity: 1; }
+.pw2-inner { overflow: hidden; min-height: 0; }
+#app[data-reduce="1"] .pw2-wrap { transition: none; }
 .sync-foot { font-size: 11px; color: var(--sub); margin-top: 12px; letter-spacing: .03em; }
 .sync-link { background: none; border: none; color: var(--ink); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .sync-err { margin-top: 10px; font-size: 11px; color: #C4524E; border: 1.5px solid #C4524E; border-radius: 6px; padding: 8px 10px; letter-spacing: .03em; }
@@ -416,7 +424,16 @@ body { background: var(--desk, #E9E1D2); }
 
 /* fixed chrome */
 .onb-logo { position: fixed; top: 22px; left: 26px; font-size: 12px; letter-spacing: .28em; color: var(--ink); z-index: 2; }
-.onb-skip { position: fixed; top: 18px; right: 24px; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); border-radius: 8px; padding: 9px 16px; font-size: 13px; cursor: pointer; z-index: 2; }
+.onb-skip {
+  position: fixed; top: 18px; right: 24px; z-index: 2;
+  border: 2px solid var(--ink); background: var(--paper); color: var(--ink);
+  border-radius: 8px; padding: 8px 16px; cursor: pointer;
+  font-family: "Space Mono", monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  box-shadow: 3px 3px 0 var(--sub); transform: rotate(1deg);
+  transition: transform .2s var(--spring), box-shadow .2s var(--spring);
+}
+.onb-skip:hover { transform: rotate(1deg) translate(-1px, -1px); box-shadow: 4px 4px 0 var(--sub); }
+.onb-skip:active { transform: scale(.96); box-shadow: 2px 2px 0 var(--sub); }
 .onb-rail { position: fixed; bottom: 26px; left: 26px; display: flex; align-items: center; gap: 10px; font-size: 11px; letter-spacing: .14em; color: var(--sub); z-index: 2; }
 .onb-rail .bar { width: 120px; height: 2px; background: var(--paperEdge); border-radius: 2px; overflow: hidden; }
 .onb-rail .bar i { display: block; height: 100%; width: 0; background: var(--ink); transition: width .5s var(--spring); }

@@ -180,6 +180,25 @@ export async function disable() {
 }
 
 /**
+ * Send a password-reset email (Supabase /auth/v1/recover). Runs on the anon key,
+ * no session needed. Supabase always answers 200 even for an unknown address
+ * (anti-enumeration), so we never reveal whether an account exists; the only
+ * failure worth surfacing is rate-limiting. The email links to the Site URL with
+ * a `type=recovery` token, where our landing page lets the user set a new password.
+ */
+export async function recoverPassword(email) {
+  if (!email) throw new Error('AUTH_FAILED: email required');
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (res.ok) return { ok: true };
+  if (res.status === 429) throw new Error('AUTH_FAILED: too many attempts — wait a minute');
+  throw new Error(`AUTH_FAILED: reset failed (${res.status})`);
+}
+
+/**
  * PULL the remote vault → MERGE with local → PUSH the merged result.
  *
  * @param {Object} localVault  full vault from storage.exportData()

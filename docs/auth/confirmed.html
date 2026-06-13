@@ -1,46 +1,183 @@
 <!doctype html>
 <!--
-  Landing page shown AFTER a user clicks the email-confirmation link.
-  Supabase verifies the account, then redirects to its "Site URL" with tokens in
-  the URL fragment (which we intentionally ignore — the extension does its own
-  sign-in). Host this page (e.g. GitHub Pages) and set it as:
-    Supabase → Authentication → URL Configuration → Site URL
-  This replaces the default http://localhost:3000 that currently errors.
+  Single Supabase "Site URL" landing page — handles BOTH auth redirects:
 
-  NOTE: a web page cannot open a chrome-extension:// page (browser security), so
-  we can't auto-redirect into the extension. Instead we tell the user to reopen
-  the extension — where the email is already pre-filled (see Lucik's UI task).
+    • Email confirmation (signup) → shows "Email confirmed".
+    • Password recovery (type=recovery) → shows a "Set a new password" form,
+      then calls PUT /auth/v1/user with the recovery session to change it.
+
+  After Supabase verifies a link it redirects here with tokens in the URL
+  *fragment* (#access_token=…&type=…). The fragment never reaches a server; we
+  read it client-side, then scrub it from the address bar.
+
+  Host this file (e.g. GitHub Pages) and set its URL as BOTH:
+    Supabase → Authentication → URL Configuration → Site URL
+    Supabase → Authentication → URL Configuration → Redirect URLs (allowlist)
+
+  A web page cannot open a chrome-extension:// page (browser security), so we
+  can't bounce the user straight into the extension — we tell them to reopen it.
+
+  NOTE: this assumes the implicit flow (tokens in the fragment). If the project
+  is set to the PKCE flow, links arrive with ?code=… instead — see RECOVERY-SETUP.md.
 -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Email confirmed · Session Vault</title>
+  <title>Session Vault · Account</title>
   <style>
     :root { color-scheme: light; }
+    * { box-sizing: border-box; }
     body { margin:0; min-height:100vh; display:grid; place-items:center;
            background:#ECE7DE; color:#16140F;
            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; }
     .card { background:#FBF9F4; border:1px solid #E2DCD0; border-radius:16px;
-            padding:40px 44px; max-width:420px; text-align:center;
+            padding:40px 44px; max-width:420px; width:calc(100vw - 32px); text-align:center;
             box-shadow:0 12px 40px rgba(0,0,0,.08); }
     .tag { font-size:12px; font-weight:700; letter-spacing:2px; color:#2D9D78; text-transform:uppercase; }
     .check { width:56px; height:56px; border-radius:50%; background:#2D9D78; margin:18px auto 8px;
              display:grid; place-items:center; color:#fff; font-size:28px; font-weight:700; }
+    .check.key { background:#16140F; }
+    .check.bad { background:#C4524E; }
     h1 { font-size:24px; font-weight:800; margin:14px 0 8px; letter-spacing:-0.3px; }
     p  { font-size:15px; line-height:1.6; color:#5A554C; margin:0; }
     .hint { margin-top:18px; font-size:13px; color:#8A847A; }
     .foot { margin-top:22px; font-size:11px; color:#A7A196; letter-spacing:.5px; }
+    form { margin-top:20px; text-align:left; }
+    label { display:block; font-size:12px; font-weight:700; letter-spacing:.04em; color:#16140F;
+            text-transform:uppercase; margin:14px 0 6px; }
+    input { width:100%; padding:11px 13px; border:2px solid #16140F; border-radius:8px;
+            background:#FBF9F4; color:#16140F; font-size:14px; outline:none; }
+    input:focus { box-shadow:2px 2px 0 #5A554C; }
+    button { margin-top:20px; width:100%; padding:14px 18px; border:2px solid #16140F;
+             background:#16140F; color:#FBF9F4; border-radius:10px; font-size:15px; font-weight:700;
+             letter-spacing:.3px; cursor:pointer; box-shadow:4px 4px 0 #5A554C;
+             transition:transform .15s ease, box-shadow .15s ease; }
+    button:hover:not(:disabled) { transform:translate(-1px,-1px); box-shadow:5px 5px 0 #5A554C; }
+    button:disabled { opacity:.6; cursor:default; box-shadow:none; }
+    .msg { margin-top:12px; font-size:13px; line-height:1.5; min-height:1px; }
+    .msg.err { color:#C4524E; }
+    .msg.ok  { color:#2D9D78; }
+    [hidden] { display:none !important; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="tag">Session Vault</div>
-    <div class="check">✓</div>
-    <h1>Email confirmed</h1>
-    <p>Your account is ready. Head back to the <strong>Session Vault</strong> extension and sign in to start syncing your tabs.</p>
-    <p class="hint">You can close this tab.</p>
+
+    <!-- View: email confirmed (default) -->
+    <div id="view-confirmed">
+      <div class="check">✓</div>
+      <h1>Email confirmed</h1>
+      <p>Your account is ready. Head back to the <strong>Session Vault</strong> extension and sign in to start syncing your tabs.</p>
+      <p class="hint">You can close this tab.</p>
+    </div>
+
+    <!-- View: set a new password (type=recovery) -->
+    <div id="view-recovery" hidden>
+      <div class="check key">🔑</div>
+      <h1>Set a new password</h1>
+      <p>Choose a new password for your <strong>Session Vault</strong> account.</p>
+      <form id="reset-form" novalidate>
+        <label for="pw">New password</label>
+        <input id="pw" type="password" autocomplete="new-password" placeholder="at least 6 characters" />
+        <label for="pw2">Confirm password</label>
+        <input id="pw2" type="password" autocomplete="new-password" placeholder="repeat the password" />
+        <div class="msg" id="reset-msg" role="status"></div>
+        <button type="submit" id="reset-btn">Update password</button>
+      </form>
+    </div>
+
+    <!-- View: password updated -->
+    <div id="view-done" hidden>
+      <div class="check">✓</div>
+      <h1>Password updated</h1>
+      <p>You're all set. Reopen the <strong>Session Vault</strong> extension and sign in with your new password.</p>
+      <p class="hint">You can close this tab.</p>
+    </div>
+
+    <!-- View: link problem -->
+    <div id="view-error" hidden>
+      <div class="check bad">!</div>
+      <h1>This link didn't work</h1>
+      <p id="error-text">The reset link is invalid or has expired. Request a new one from the extension's “Forgot password?” link.</p>
+      <p class="hint">You can close this tab.</p>
+    </div>
+
     <p class="foot">Never lose your tabs again</p>
   </div>
+
+  <script>
+    // ── Supabase project (publishable/anon key — safe to ship, same as the extension) ──
+    const SUPABASE_URL = 'https://rbsdtmjhhstqhqgddltu.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_-HOOGqi7Fors-Q7ncEDO6Q_lWUkkIzT';
+
+    const show = (id) => {
+      for (const v of ['view-confirmed', 'view-recovery', 'view-done', 'view-error']) {
+        document.getElementById(v).hidden = (v !== id);
+      }
+    };
+
+    // Read the URL fragment (#access_token=…&type=…) then scrub it from the bar.
+    const params = new URLSearchParams(location.hash.slice(1));
+    const accessToken = params.get('access_token');
+    const type = params.get('type');
+    const hashError = params.get('error_description') || params.get('error');
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+
+    if (hashError) {
+      document.getElementById('error-text').textContent = decodeURIComponent(hashError).replace(/\+/g, ' ');
+      show('view-error');
+    } else if (type === 'recovery' && accessToken) {
+      show('view-recovery');
+      wireResetForm(accessToken);
+    } else {
+      show('view-confirmed'); // signup confirmation (or a direct visit)
+    }
+
+    function wireResetForm(token) {
+      const form = document.getElementById('reset-form');
+      const pw = document.getElementById('pw');
+      const pw2 = document.getElementById('pw2');
+      const btn = document.getElementById('reset-btn');
+      const msg = document.getElementById('reset-msg');
+      const say = (text, kind) => { msg.textContent = text; msg.className = 'msg ' + (kind || ''); };
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const a = pw.value, b = pw2.value;
+        if (a.length < 6) return say('Password must be at least 6 characters.', 'err');
+        if (a !== b)      return say('Passwords don’t match.', 'err');
+
+        btn.disabled = true; btn.textContent = 'Updating…'; say('');
+        try {
+          const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+            method: 'PUT',
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: 'Bearer ' + token,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ password: a }),
+          });
+          if (res.ok) { show('view-done'); return; }
+          // 401/403 → recovery session expired; anything else → surface the message.
+          let detail = '';
+          try { const j = await res.json(); detail = j.msg || j.error_description || j.message || ''; } catch (_) {}
+          if (res.status === 401 || res.status === 403) {
+            document.getElementById('error-text').textContent =
+              'This reset link has expired. Request a new one from the extension’s “Forgot password?” link.';
+            show('view-error');
+          } else {
+            say(detail || `Could not update the password (${res.status}). Try again.`, 'err');
+            btn.disabled = false; btn.textContent = 'Update password';
+          }
+        } catch (_) {
+          say('Network error — check your connection and try again.', 'err');
+          btn.disabled = false; btn.textContent = 'Update password';
+        }
+      });
+    }
+  </script>
 </body>
 </html>

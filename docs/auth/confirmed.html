@@ -19,63 +19,135 @@
 
   NOTE: this assumes the implicit flow (tokens in the fragment). If the project
   is set to the PKCE flow, links arrive with ?code=… instead — see RECOVERY-SETUP.md.
+
+  DESIGN: reskinned to the Session Vault "Flip Desk" language (app/app.css) —
+  paper/ink palette, Archivo + Space Mono, hard offset shadows, tactile button.
+  The element IDs and the <script> below are the wiring contract — do not rename.
 -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Session Vault · Account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Space+Mono:wght@400;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
   <style>
-    :root { color-scheme: light; }
-    * { box-sizing: border-box; }
-    body { margin:0; min-height:100vh; display:grid; place-items:center;
-           background:#ECE7DE; color:#16140F;
-           font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; }
-    .card { background:#FBF9F4; border:1px solid #E2DCD0; border-radius:16px;
-            padding:40px 44px; max-width:420px; width:calc(100vw - 32px); text-align:center;
-            box-shadow:0 12px 40px rgba(0,0,0,.08); }
-    .tag { font-size:12px; font-weight:700; letter-spacing:2px; color:#2D9D78; text-transform:uppercase; }
-    .check { width:56px; height:56px; border-radius:50%; background:#2D9D78; margin:18px auto 8px;
-             display:grid; place-items:center; color:#fff; font-size:28px; font-weight:700; }
-    .check.key { background:#16140F; }
-    .check.bad { background:#C4524E; }
-    h1 { font-size:24px; font-weight:800; margin:14px 0 8px; letter-spacing:-0.3px; }
-    p  { font-size:15px; line-height:1.6; color:#5A554C; margin:0; }
-    .hint { margin-top:18px; font-size:13px; color:#8A847A; }
-    .foot { margin-top:22px; font-size:11px; color:#A7A196; letter-spacing:.5px; }
-    form { margin-top:20px; text-align:left; }
-    label { display:block; font-size:12px; font-weight:700; letter-spacing:.04em; color:#16140F;
-            text-transform:uppercase; margin:14px 0 6px; }
-    input { width:100%; padding:11px 13px; border:2px solid #16140F; border-radius:8px;
-            background:#FBF9F4; color:#16140F; font-size:14px; outline:none; }
-    input:focus { box-shadow:2px 2px 0 #5A554C; }
-    button { margin-top:20px; width:100%; padding:14px 18px; border:2px solid #16140F;
-             background:#16140F; color:#FBF9F4; border-radius:10px; font-size:15px; font-weight:700;
-             letter-spacing:.3px; cursor:pointer; box-shadow:4px 4px 0 #5A554C;
-             transition:transform .15s ease, box-shadow .15s ease; }
-    button:hover:not(:disabled) { transform:translate(-1px,-1px); box-shadow:5px 5px 0 #5A554C; }
+    :root {
+      color-scheme: light;
+      --desk:#E9E1D2; --deskHi:#F1EADC; --paper:#FBF8F0; --ink:#17130C;
+      --sub:rgba(23,19,12,.55); --faint:rgba(23,19,12,.28); --edge:rgba(23,19,12,.16);
+      --green:#2D9D78; --gold:#D9A431; --red:#C4524E;
+    }
+    * { box-sizing:border-box; }
+    html,body { height:100%; }
+    body {
+      margin:0; min-height:100vh; display:grid; place-items:center; padding:24px;
+      background:var(--desk);
+      background-image:radial-gradient(rgba(23,19,12,.05) 1px, transparent 1.4px);
+      background-size:22px 22px;
+      color:var(--ink); font-family:"Archivo",system-ui,sans-serif;
+    }
+    .mono { font-family:"Space Mono",ui-monospace,monospace; }
+
+    .card {
+      position:relative; background:var(--paper); border:2px solid var(--ink);
+      border-radius:16px; padding:34px 38px 30px; max-width:440px;
+      width:calc(100vw - 32px); text-align:center;
+      box-shadow:8px 9px 0 rgba(23,19,12,.13);
+    }
+    /* mustard top edge — the "one mustard" brand accent */
+    .card::before {
+      content:""; position:absolute; left:-2px; right:-2px; top:-2px; height:9px;
+      background:var(--gold); border:2px solid var(--ink); border-bottom:none;
+      border-radius:16px 16px 0 0;
+    }
+
+    .brand { display:flex; align-items:center; justify-content:center; gap:11px; margin-top:6px; }
+    .brand .word { font-weight:900; letter-spacing:-.02em; font-size:20px; text-transform:uppercase; }
+    .brand svg { display:block; flex:0 0 auto; }
+    .rule { height:3px; background:var(--ink); border-radius:2px; width:54px; margin:14px auto 0; opacity:.85; }
+
+    .badge {
+      width:60px; height:60px; border-radius:50%; border:2px solid var(--ink);
+      margin:24px auto 6px; display:grid; place-items:center; color:#fff;
+      box-shadow:4px 4px 0 rgba(23,19,12,.18);
+    }
+    .badge svg { width:28px; height:28px; }
+    .badge.ok  { background:var(--green); }
+    .badge.key { background:var(--ink); }
+    .badge.bad { background:var(--red); font-family:"Archivo"; font-weight:900; font-size:30px; line-height:1; }
+
+    h1 { font-size:25px; font-weight:800; margin:14px 0 8px; letter-spacing:-.01em; }
+    p  { font-size:15px; line-height:1.6; color:var(--sub); margin:0; }
+    p strong { color:var(--ink); font-weight:700; }
+    .hint { margin-top:18px; font-size:12px; letter-spacing:.04em; color:var(--faint); }
+
+    form { margin-top:22px; text-align:left; }
+    label {
+      display:block; font-family:"Space Mono",monospace; font-size:11px; font-weight:700;
+      letter-spacing:.14em; text-transform:uppercase; color:var(--ink); margin:14px 0 7px;
+    }
+    input {
+      width:100%; padding:11px 13px; border:2px solid var(--ink); border-radius:8px;
+      background:var(--paper); color:var(--ink); font-size:14px; outline:none;
+      font-family:"Space Mono",monospace;
+    }
+    input:focus { box-shadow:2px 2px 0 var(--sub); }
+
+    button {
+      margin-top:22px; width:100%; padding:14px 18px; border:2px solid var(--ink);
+      background:var(--ink); color:var(--paper); border-radius:10px;
+      font-family:"Space Mono",monospace; font-size:13px; font-weight:700;
+      letter-spacing:.12em; text-transform:uppercase; cursor:pointer;
+      box-shadow:4px 4px 0 var(--sub); transition:transform .15s ease, box-shadow .15s ease;
+    }
+    button:hover:not(:disabled) { transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--sub); }
+    button:active:not(:disabled) { transform:translate(1px,1px); box-shadow:2px 2px 0 var(--sub); }
     button:disabled { opacity:.6; cursor:default; box-shadow:none; }
+
     .msg { margin-top:12px; font-size:13px; line-height:1.5; min-height:1px; }
-    .msg.err { color:#C4524E; }
-    .msg.ok  { color:#2D9D78; }
+    .msg.err { color:var(--red); }
+    .msg.ok  { color:var(--green); }
+
+    .foot { margin-top:24px; font-family:"Caveat",cursive; font-size:19px; color:var(--sub); }
     [hidden] { display:none !important; }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="tag">Session Vault</div>
+    <!-- brand lockup: Deck mark + wordmark (shown in every state) -->
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+        <g stroke="#17130C" stroke-width="2" stroke-linejoin="round">
+          <rect x="16" y="7" width="22" height="29" rx="4" fill="#FBF8F0"/>
+          <rect x="12" y="10.5" width="22" height="29" rx="4" fill="#FBF8F0"/>
+          <rect x="8" y="14" width="22" height="29" rx="4" fill="#FBF8F0"/>
+        </g>
+        <path d="M12 14 H26 a4 4 0 0 1 4 4 V20 H8 V18 a4 4 0 0 1 4 -4 Z" fill="#D9A431"/>
+        <g stroke="#17130C" stroke-width="2" fill="none"><rect x="8" y="14" width="22" height="29" rx="4"/></g>
+        <rect x="13" y="25" width="12" height="2.4" rx="1.2" fill="#17130C" opacity=".55"/>
+        <rect x="13" y="30" width="8" height="2.4" rx="1.2" fill="#17130C" opacity=".35"/>
+      </svg>
+      <span class="word">SessionVault</span>
+    </div>
+    <div class="rule"></div>
 
     <!-- View: email confirmed (default) -->
     <div id="view-confirmed">
-      <div class="check">✓</div>
+      <div class="badge ok">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>
+      </div>
       <h1>Email confirmed</h1>
       <p>Your account is ready. Head back to the <strong>Session Vault</strong> extension and sign in to start syncing your tabs.</p>
-      <p class="hint">You can close this tab.</p>
+      <p class="hint mono">You can close this tab</p>
     </div>
 
     <!-- View: set a new password (type=recovery) -->
     <div id="view-recovery" hidden>
-      <div class="check key">🔑</div>
+      <div class="badge key">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      </div>
       <h1>Set a new password</h1>
       <p>Choose a new password for your <strong>Session Vault</strong> account.</p>
       <form id="reset-form" novalidate>
@@ -90,18 +162,20 @@
 
     <!-- View: password updated -->
     <div id="view-done" hidden>
-      <div class="check">✓</div>
+      <div class="badge ok">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>
+      </div>
       <h1>Password updated</h1>
       <p>You're all set. Reopen the <strong>Session Vault</strong> extension and sign in with your new password.</p>
-      <p class="hint">You can close this tab.</p>
+      <p class="hint mono">You can close this tab</p>
     </div>
 
     <!-- View: link problem -->
     <div id="view-error" hidden>
-      <div class="check bad">!</div>
+      <div class="badge bad">!</div>
       <h1>This link didn't work</h1>
       <p id="error-text">The reset link is invalid or has expired. Request a new one from the extension's “Forgot password?” link.</p>
-      <p class="hint">You can close this tab.</p>
+      <p class="hint mono">You can close this tab</p>
     </div>
 
     <p class="foot">Never lose your tabs again</p>

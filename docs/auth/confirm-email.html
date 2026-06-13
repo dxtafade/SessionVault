@@ -1,33 +1,48 @@
 <!--
   Supabase → Authentication → Email Templates → "Confirm signup".
   Paste this HTML into the template body. Supabase fills {{ .ConfirmationURL }}
-  and {{ .Email }} at send time. Inline styles only (email clients ignore <style>).
+  and {{ .Email }} at send time. Inline styles only (email clients ignore <style>
+  and JS, and won't load web fonts — everything falls back to system fonts).
   Source of truth lives here in the repo; the live copy is in the Supabase dashboard.
+
+  DESIGN: Session Vault "Flip Desk" palette — paper card, ink text, one mustard
+  accent, dark tactile CTA. Keep the {{ .ConfirmationURL }} / {{ .Email }} tags.
 -->
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#ECE7DE;padding:32px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#E9E1D2;padding:34px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
   <tr>
     <td align="center">
-      <table width="440" cellpadding="0" cellspacing="0" style="background:#FBF9F4;border:1px solid #E2DCD0;border-radius:14px;overflow:hidden;">
+      <table width="448" cellpadding="0" cellspacing="0" role="presentation" style="background:#FBF8F0;border:2px solid #17130C;border-radius:14px;overflow:hidden;box-shadow:7px 8px 0 rgba(23,19,12,.13);">
+        <!-- mustard top edge — the "one mustard" brand accent -->
+        <tr><td height="8" bgcolor="#D9A431" style="font-size:0;line-height:8px;">&nbsp;</td></tr>
         <tr>
-          <td style="padding:32px 36px 8px;">
-            <div style="font-size:13px;font-weight:700;letter-spacing:2px;color:#2D9D78;text-transform:uppercase;">Session Vault</div>
-            <h1 style="margin:14px 0 6px;font-size:24px;font-weight:800;color:#16140F;letter-spacing:-0.3px;">Confirm your email</h1>
-            <p style="margin:0;font-size:15px;line-height:1.55;color:#5A554C;">
+          <td style="padding:28px 36px 8px;">
+            <!-- brand lockup: mini deck-card + wordmark -->
+            <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+              <td valign="middle" style="padding-right:11px;">
+                <table width="26" cellpadding="0" cellspacing="0" role="presentation" style="border:2px solid #17130C;border-radius:6px;border-collapse:separate;overflow:hidden;">
+                  <tr><td height="6" bgcolor="#D9A431" style="font-size:0;line-height:6px;">&nbsp;</td></tr>
+                  <tr><td height="22" bgcolor="#FBF8F0" style="font-size:0;line-height:22px;">&nbsp;</td></tr>
+                </table>
+              </td>
+              <td valign="middle" style="font-family:Archivo,'Segoe UI',Arial,sans-serif;font-weight:800;font-size:19px;letter-spacing:-0.3px;color:#17130C;text-transform:uppercase;">SessionVault</td>
+            </tr></table>
+            <h1 style="margin:18px 0 6px;font-size:24px;font-weight:800;color:#17130C;letter-spacing:-0.3px;">Confirm your email</h1>
+            <p style="margin:0;font-size:15px;line-height:1.55;color:#6B665C;">
               You're one click from never losing your tabs again. Confirm
-              <strong style="color:#16140F;">{{ .Email }}</strong> to finish creating your account.
+              <strong style="color:#17130C;">{{ .Email }}</strong> to finish creating your account.
             </p>
           </td>
         </tr>
         <tr>
-          <td style="padding:24px 36px 8px;">
+          <td style="padding:22px 36px 6px;">
             <a href="{{ .ConfirmationURL }}"
-               style="display:block;background:#16140F;color:#FBF9F4;text-decoration:none;text-align:center;padding:15px 20px;border-radius:10px;font-size:15px;font-weight:700;letter-spacing:0.3px;">
+               style="display:block;background:#17130C;color:#FBF8F0;text-decoration:none;text-align:center;padding:15px 20px;border:2px solid #17130C;border-radius:10px;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;font-family:'Space Mono',Consolas,monospace;">
               Confirm email&nbsp;→
             </a>
           </td>
         </tr>
         <tr>
-          <td style="padding:6px 36px 28px;">
+          <td style="padding:8px 36px 28px;">
             <p style="margin:14px 0 0;font-size:12px;line-height:1.5;color:#8A847A;">
               If the button doesn't work, copy this link into your browser:<br>
               <a href="{{ .ConfirmationURL }}" style="color:#2D9D78;word-break:break-all;">{{ .ConfirmationURL }}</a>
@@ -38,7 +53,7 @@
           </td>
         </tr>
       </table>
-      <p style="margin:18px 0 0;font-size:11px;color:#A7A196;letter-spacing:0.5px;">Session Vault · Never lose your tabs again</p>
+      <p style="margin:18px 0 0;font-size:12px;color:#8A847A;letter-spacing:0.4px;font-style:italic;font-family:'Caveat','Segoe UI',cursive;">Never lose your tabs again</p>
     </td>
   </tr>
 </table>

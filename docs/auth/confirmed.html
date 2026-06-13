@@ -105,8 +105,10 @@
       background:transparent; color:var(--sub); box-shadow:none; cursor:pointer;
       letter-spacing:0; text-transform:none; transition:color .15s, background .15s;
     }
-    .pw-eye:hover { color:var(--ink); background:var(--edge); transform:translateY(-50%); box-shadow:none; }
-    .pw-eye:active { transform:translateY(-50%); box-shadow:none; }
+    /* :not(:disabled) keeps these above the generic button:hover/active rules,
+       which would otherwise apply their translate()+shadow and slide the eye off-center */
+    .pw-eye:hover:not(:disabled) { color:var(--ink); background:var(--edge); transform:translateY(-50%); box-shadow:none; }
+    .pw-eye:active:not(:disabled) { transform:translateY(-50%); box-shadow:none; }
     .pw-eye svg { width:18px; height:18px; display:block; }
 
     button {

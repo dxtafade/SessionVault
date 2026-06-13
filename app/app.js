@@ -547,7 +547,30 @@ async function renderSync() {
 
   const errLine = status.error ? `<div class="sync-err mono">${esc(status.error)}</div>` : '';
   let body;
-  if (!status.enabled) {
+  if (!status.enabled && syncMode === 'forgot') {
+    // Dedicated password-recovery screen — its own view, not inline in sign-in.
+    const resetBlock = resetSentEmail ? `
+      <div class="sync-info">
+        <span class="si-ico">🔑</span>
+        <div class="si-text">
+          <b>Check your inbox</b>
+          <span class="si-body">We sent a password-reset link to <b>${esc(resetSentEmail)}</b>. Open it to set a new password, then sign in here.</span>
+          <span class="si-hint mono">No email? Check Spam — and make sure it's the address you signed up with.</span>
+        </div>
+      </div>` : '';
+    body = `
+      <div class="set-section mono">RESET PASSWORD</div>
+      <p class="sync-lead mono">Enter your account email — we'll send a link to set a new password. Your encryption passphrase is separate and isn't changed here.</p>
+      ${resetBlock}
+      <input id="sync-email" class="sync-input mono" type="email" placeholder="email" autocomplete="username" value="${esc(syncEmail)}" />
+      ${errLine}
+      <button class="btn-squash tactile" id="sync-reset-send" style="width:100%;margin-top:12px;transform:none">
+        ${resetSentEmail ? 'RESEND RESET LINK' : 'SEND RESET LINK'}
+      </button>
+      <div class="sync-foot mono">
+        <button class="sync-link" id="sync-back">← Back to sign in</button>
+      </div>`;
+  } else if (!status.enabled) {
     // After a successful Create account, Supabase sends a confirmation link and
     // returns no session yet — that's a SUCCESS, not an error. Show a friendly
     // (non-red) block, with the account's email prefilled for the next sign-in.
@@ -561,17 +584,6 @@ async function renderSync() {
           <button class="si-resend mono" id="sync-resend">↻ Resend email</button>
         </div>
       </div>` : '';
-    // Forgot-password success: Supabase accepted the reset request and (if the
-    // account exists) emailed a link. Friendly, non-red — mirrors confirmBlock.
-    const resetBlock = resetSentEmail ? `
-      <div class="sync-info">
-        <span class="si-ico">🔑</span>
-        <div class="si-text">
-          <b>Check your inbox</b>
-          <span class="si-body">We sent a password-reset link to <b>${esc(resetSentEmail)}</b>. Open it to set a new password, then sign in here.</span>
-          <span class="si-hint mono">No email? Check Spam — and make sure it's the address you signed up with.</span>
-        </div>
-      </div>` : '';
     const isSignup = syncMode === 'signup';
     // Sign-up only: confirm the password to catch typos before the account exists.
     // Always in the DOM (so it can animate); revealed once the password is typed.
@@ -581,7 +593,7 @@ async function renderSync() {
           <input id="sync-pw2" class="sync-input mono" type="password" placeholder="confirm password" autocomplete="new-password" />
         </div>
       </div>` : '';
-    // Sign-in only: a way out when the account password is forgotten.
+    // Sign-in only: a way out when the account password is forgotten → its own screen.
     const forgotLink = !isSignup ? `
       <div class="sync-foot mono" style="margin-top:8px">
         <button class="sync-link" id="sync-forgot">Forgot password?</button>
@@ -589,7 +601,6 @@ async function renderSync() {
     body = `
       <div class="set-section mono">${isSignup ? 'CREATE ACCOUNT' : 'SIGN IN'}</div>
       ${confirmBlock}
-      ${resetBlock}
       <input id="sync-email" class="sync-input mono" type="email" placeholder="email" autocomplete="username" value="${esc(syncEmail)}" />
       <div class="sync-pw-wrap">
         <input id="sync-pw" class="sync-input mono has-reveal" type="password" placeholder="password" autocomplete="${isSignup ? 'new-password' : 'current-password'}" />
@@ -632,24 +643,31 @@ async function renderSync() {
   ov.onclick = (e) => { if (ov._downSelf && e.target === ov) closeSync(); };
   $('[data-done]', ov).onclick = closeSync;
 
-  if (!status.enabled) {
+  if (!status.enabled && syncMode === 'forgot') {
+    // ── Dedicated reset-password screen ──
     $('#sync-email', ov).oninput = (e) => { syncEmail = e.target.value; };
-    $('#sync-toggle', ov).onclick = () => { syncMode = syncMode === 'signup' ? 'signin' : 'signup'; confirmEmail = null; resetSentEmail = null; renderSync(); };
-    const forgot = $('#sync-forgot', ov);
-    if (forgot) forgot.onclick = async () => {
+    $('#sync-back', ov).onclick = () => { syncMode = 'signin'; resetSentEmail = null; renderSync(); };
+    const send = $('#sync-reset-send', ov);
+    send.onclick = async () => {
       const email = $('#sync-email', ov).value.trim();
       if (!email) return toast('Enter your email first');
       syncEmail = email;
-      forgot.disabled = true; forgot.textContent = 'Sending…';
+      send.disabled = true; send.textContent = 'Sending…';
       try {
         await api.recoverPassword(email);
         confirmEmail = null; resetSentEmail = email;
         renderSync();
       } catch (err) {
         toast(String(err.message).replace(/^AUTH_FAILED:\s*/, '') || 'Could not send reset email');
-        forgot.disabled = false; forgot.textContent = 'Forgot password?';
+        send.disabled = false; send.textContent = resetSentEmail ? 'RESEND RESET LINK' : 'SEND RESET LINK';
       }
     };
+  } else if (!status.enabled) {
+    $('#sync-email', ov).oninput = (e) => { syncEmail = e.target.value; };
+    $('#sync-toggle', ov).onclick = () => { syncMode = syncMode === 'signup' ? 'signin' : 'signup'; confirmEmail = null; resetSentEmail = null; renderSync(); };
+    // "Forgot password?" → open the dedicated reset screen (carries the typed email).
+    const forgot = $('#sync-forgot', ov);
+    if (forgot) forgot.onclick = () => { syncMode = 'forgot'; confirmEmail = null; renderSync(); };
 
     // password field: reveal toggle + non-ASCII guard, and on sign-up slide the
     // "confirm password" field in once typing starts — all on one input handler.
@@ -727,7 +745,7 @@ async function renderSync() {
   }
 }
 function renderSyncError(msg) { const ov = $('#overlay-sync'); if (!ov) return; const m = ov.querySelector('.modal'); const e = document.createElement('div'); e.className = 'sync-err mono'; e.textContent = msg; m.appendChild(e); }
-function closeSync() { syncOpen = false; const ov = $('#overlay-sync'); if (ov) ov.remove(); }
+function closeSync() { syncOpen = false; syncMode = 'signin'; resetSentEmail = null; const ov = $('#overlay-sync'); if (ov) ov.remove(); }
 
 // ── onboarding (first run; scroll-driven narrative, replayable from settings) ────
 // UX from the SessionVault Prototype handoff (5 sections: hero · 3 steps · CTA,

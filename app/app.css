@@ -240,6 +240,7 @@ body { background: var(--desk, #E9E1D2); }
 /* cloud sync panel */
 .sync-input { width: 100%; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 8px; background: var(--paper); color: var(--ink); font-size: 13px; margin-top: 10px; outline: none; }
 .sync-input:focus { box-shadow: 2px 2px 0 var(--sub); }
+.sync-lead { font-size: 12px; line-height: 1.55; color: var(--sub); letter-spacing: .02em; margin: 6px 0 2px; }
 
 /* password field with an inset reveal toggle (kept inside the border) */
 .sync-pw-wrap { position: relative; margin-top: 10px; }

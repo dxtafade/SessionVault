@@ -14,6 +14,158 @@ const app = $('#app');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// ── i18n (RU/ENG) ───────────────────────────────────────────────────────────────
+// All user-facing copy lives here. t('key', a, b) substitutes {0},{1}. The active
+// language is prefs.lang; header toggle flips it. Brand "SESSIONVAULT" stays as-is.
+// Engine error messages (from background/) are returned in English and not covered.
+const I18N = {
+  en: {
+    age_days: "{0} days ago", age_yesterday: "yesterday", age_h: "{0}h ago", age_m: "{0}m ago", age_now: "just now",
+    unfiled: "Unfiled", undo: "UNDO",
+    prev_shelf: "Previous shelf", next_shelf: "Next shelf", new_shelf: "New shelf",
+    sessions: "SESSIONS", tabs: "TABS", search: "SEARCH…", save_open: "＋ SAVE OPEN TABS",
+    chip_pro_title: "Pro — unlimited saved sessions", chip_free_title: "{0} of {1} free saved sessions",
+    cloud_sync: "Cloud sync", settings: "Settings", language: "Language",
+    crash_q: "Did your browser close unexpectedly?",
+    crash_sub: "{0} of {1} tabs from before aren't open — bring them back.",
+    recover_n: "↩ RECOVER {0} TABS", dismiss: "Dismiss",
+    stamp: "{0} TABS KEPT ★ {1} SESSIONS",
+    drop_delete: "DROP TO DELETE", bin: "BIN",
+    empty_h: "this shelf is bare", empty_b: "Save your open tabs into a stack with “Save open tabs”.",
+    restore_all: "↗ ALL",
+    restored_tabs: "↗ {0} tabs restored — opening windows", copied: "⤴ tab list copied to clipboard",
+    confirm_delete: "Delete “{0}” ({1} tabs)?", moved_bin: "“{0}” moved to the bin",
+    recovering: "↩ RECOVERING…", recovered: "↩ recovered {0} tabs into a new session",
+    nothing_recover: "Nothing to recover — no snapshot from a previous session",
+    recover_fail: "Could not recover: {0}", recovery_dismissed: "Recovery dismissed",
+    name_session: "Name this session:", session_default: "Session — {0}", open_tabs_fallback: "Open tabs",
+    saved_ok: "✓ open tabs saved as a new session",
+    free_limit: "Free limit reached (50). Delete some or upgrade to Pro.", save_fail: "Could not save: {0}",
+    new_shelf_name: "New shelf name:",
+    cards_dealt: "{0} cards dealt", restore_all_btn: "↗ RESTORE ALL", share_btn: "⤴ SHARE",
+    bin_it: "× BIN IT", restack: "RESTACK ↩", open_this: "Open this tab",
+    click_restack: "CLICK ANYWHERE TO RESTACK", tab_opened: "↗ tab opened",
+    the_bin: "THE BIN", sessions_deleted: "{0} sessions deleted", empty_good: "EMPTY FOR GOOD",
+    back: "BACK ↩", bin_empty: "Bin is empty.", restore_btn: "↩ RESTORE",
+    bin_emptied: "Bin emptied", restored_shelf: "restored to the shelf",
+    settings_title: "SETTINGS", replay_intro: "↻ REPLAY INTRO", done: "DONE ↩",
+    appearance: "APPEARANCE", behaviour: "BEHAVIOUR",
+    theme: "Theme", theme_h: "Light desk or midnight desk", theme_light: "light", theme_dark: "dark",
+    texture: "Desk texture", texture_h: "The grain under your stacks", tex_grain: "grain", tex_linen: "linen", tex_clean: "clean",
+    reduce_motion: "Reduce motion", reduce_h: "Calm the springs and shuffles",
+    confirm_bin: "Confirm before binning", confirm_bin_h: "Ask first when you delete a stack",
+    autosave: "Autosave open tabs", autosave_h: "Periodically snapshot your tabs (Pro)",
+    autosave_int: "Autosave interval", autosave_int_h: "Minutes between snapshots",
+    keep_auto: "Keep autosaves", keep_auto_h: "How many snapshots to retain",
+    cloud_sync_title: "CLOUD SYNC", create_account: "CREATE ACCOUNT", sign_in: "SIGN IN",
+    confirm_almost: "Almost there — confirm your email",
+    confirm_body: "We sent a link to <b>{0}</b>. Open it, tap “Confirm email”, then sign in.",
+    confirm_hint: "Don't see it? Check Spam and Promotions — it can take a minute to arrive.",
+    resend: "↻ Resend email", check_inbox: "Check your inbox",
+    reset_body: "We sent a password-reset link to <b>{0}</b>. Open it to set a new password, then sign in here.",
+    reset_hint: "No email? Check Spam — and make sure it's the address you signed up with.",
+    ph_email: "email", ph_password: "password", ph_confirm_pw: "confirm password",
+    pw_warn: "Use only English letters, numbers and symbols — no spaces, accents or non-Latin characters.",
+    create_connect: "CREATE ACCOUNT & CONNECT", signin_connect: "SIGN IN & CONNECT",
+    have_account: "Have an account?", new_here: "New here?", sign_in_link: "Sign in", create_one: "Create one",
+    forgot_pw: "Forgot password?", e2e_note: "End-to-end encrypted. Your passphrase never leaves this device.",
+    signed_in: "Signed in", sign_out: "SIGN OUT", enc_passphrase: "ENCRYPTION PASSPHRASE",
+    ph_passphrase: "passphrase (same on every device)", pp_default: "used to encrypt your vault before it leaves the device",
+    sync_now: "⟳ SYNC NOW", syncing: "⟳ SYNCING…", last_synced: "Last synced {0}", not_synced: "Not synced yet",
+    show_pw: "Show password", hide_pw: "Hide password",
+    toast_enter_creds: "Enter email and password", toast_pw_short: "Password must be at least 6 characters",
+    toast_pw_mismatch: "Passwords don’t match", toast_connected: "☁ connected",
+    toast_enter_email: "Enter your email first", sending: "Sending…", reset_fail: "Could not send reset email",
+    resend_sent: "✉ confirmation email sent again", resend_fail: "Could not resend right now — try again in a minute",
+    enter_passphrase: "Enter your passphrase first", sync_failed: "Sync failed: {0}", vault_synced: "☁ vault synced",
+    onb_tagline: "SESSIONVAULT — TAB MANAGER", onb_hero: "A thousand tabs.\nOne vault.",
+    onb_hero_sub: "SessionVault collapses your open tabs into tidy sessions — and brings them back in one click.",
+    onb1_t: "One click — then silence",
+    onb1_b: "SessionVault collapses all your open tabs into tidy sessions — and brings them back in one click. Let your browser breathe.",
+    onb2_t: "Order finds itself",
+    onb2_b: "Tags, search and folders. Drag sessions around the desk and file them into shelves like cards on a board.",
+    onb3_t: "Everywhere you go",
+    onb3_b: "Sessions sync, end-to-end encrypted, across your devices. Home, work, on the road — your vault is always at hand.",
+    onb_get_started_q: "Get started?", onb_get_started: "Get started →", skip: "Skip", scroll_more: "scroll to discover more",
+    onb_click: "CLICK", onb_collected: "collected", tag_work: "work", tag_research: "research",
+  },
+  ru: {
+    age_days: "{0} дн. назад", age_yesterday: "вчера", age_h: "{0} ч назад", age_m: "{0} мин назад", age_now: "только что",
+    unfiled: "Без полки", undo: "ОТМЕНА",
+    prev_shelf: "Предыдущая полка", next_shelf: "Следующая полка", new_shelf: "Новая полка",
+    sessions: "СЕССИЙ", tabs: "ВКЛАДОК", search: "ПОИСК…", save_open: "＋ СОХРАНИТЬ ВКЛАДКИ",
+    chip_pro_title: "Pro — без лимита сессий", chip_free_title: "{0} из {1} бесплатных сессий",
+    cloud_sync: "Облачная синхронизация", settings: "Настройки", language: "Язык",
+    crash_q: "Браузер закрылся неожиданно?",
+    crash_sub: "{0} из {1} прежних вкладок не открыты — вернуть их.",
+    recover_n: "↩ ВЕРНУТЬ {0} ВКЛ.", dismiss: "Скрыть",
+    stamp: "{0} ВКЛАДОК СОХРАНЕНО ★ {1} СЕССИЙ",
+    drop_delete: "БРОСЬ, ЧТОБЫ УДАЛИТЬ", bin: "КОРЗИНА",
+    empty_h: "полка пуста", empty_b: "Сохрани открытые вкладки кнопкой «Сохранить вкладки».",
+    restore_all: "↗ ВСЕ",
+    restored_tabs: "↗ {0} вкладок восстановлено — открываю окна", copied: "⤴ список вкладок скопирован",
+    confirm_delete: "Удалить «{0}» ({1} вкл.)?", moved_bin: "«{0}» в корзине",
+    recovering: "↩ ВОССТАНАВЛИВАЮ…", recovered: "↩ восстановлено {0} вкладок в новую сессию",
+    nothing_recover: "Нечего восстанавливать — нет снимка прошлой сессии",
+    recover_fail: "Не удалось восстановить: {0}", recovery_dismissed: "Восстановление скрыто",
+    name_session: "Назовите сессию:", session_default: "Сессия — {0}", open_tabs_fallback: "Открытые вкладки",
+    saved_ok: "✓ вкладки сохранены в новую сессию",
+    free_limit: "Достигнут лимит (50). Удалите часть или перейдите на Pro.", save_fail: "Не удалось сохранить: {0}",
+    new_shelf_name: "Название новой полки:",
+    cards_dealt: "{0} карт разложено", restore_all_btn: "↗ ВЕРНУТЬ ВСЕ", share_btn: "⤴ ПОДЕЛИТЬСЯ",
+    bin_it: "× В КОРЗИНУ", restack: "СЛОЖИТЬ ↩", open_this: "Открыть вкладку",
+    click_restack: "КЛИКНИ ГДЕ УГОДНО, ЧТОБЫ СЛОЖИТЬ", tab_opened: "↗ вкладка открыта",
+    the_bin: "КОРЗИНА", sessions_deleted: "{0} удалённых сессий", empty_good: "ОЧИСТИТЬ НАВСЕГДА",
+    back: "НАЗАД ↩", bin_empty: "Корзина пуста.", restore_btn: "↩ ВЕРНУТЬ",
+    bin_emptied: "Корзина очищена", restored_shelf: "возвращено на полку",
+    settings_title: "НАСТРОЙКИ", replay_intro: "↻ ПОВТОР ИНТРО", done: "ГОТОВО ↩",
+    appearance: "ВНЕШНИЙ ВИД", behaviour: "ПОВЕДЕНИЕ",
+    theme: "Тема", theme_h: "Светлый стол или ночной", theme_light: "светлый", theme_dark: "тёмный",
+    texture: "Текстура стола", texture_h: "Фактура под стопками", tex_grain: "зерно", tex_linen: "лён", tex_clean: "чисто",
+    reduce_motion: "Меньше движения", reduce_h: "Успокоить пружины и тасовку",
+    confirm_bin: "Подтверждать удаление", confirm_bin_h: "Спрашивать перед удалением стопки",
+    autosave: "Автосохранение вкладок", autosave_h: "Периодические снимки вкладок (Pro)",
+    autosave_int: "Интервал автосохранения", autosave_int_h: "Минут между снимками",
+    keep_auto: "Хранить автосохранения", keep_auto_h: "Сколько снимков хранить",
+    cloud_sync_title: "ОБЛАЧНЫЙ СИНК", create_account: "СОЗДАТЬ АККАУНТ", sign_in: "ВХОД",
+    confirm_almost: "Почти готово — подтвердите почту",
+    confirm_body: "Мы отправили ссылку на <b>{0}</b>. Откройте её, нажмите «Confirm email», затем войдите.",
+    confirm_hint: "Нет письма? Проверьте Спам и Промоакции — может прийти через минуту.",
+    resend: "↻ Отправить снова", check_inbox: "Проверьте почту",
+    reset_body: "Мы отправили ссылку для сброса на <b>{0}</b>. Откройте её, задайте новый пароль и войдите здесь.",
+    reset_hint: "Нет письма? Проверьте Спам — и что это та почта, на которую регистрировались.",
+    ph_email: "почта", ph_password: "пароль", ph_confirm_pw: "повторите пароль",
+    pw_warn: "Только латинские буквы, цифры и символы — без пробелов, акцентов и не-латинских символов.",
+    create_connect: "СОЗДАТЬ И ПОДКЛЮЧИТЬ", signin_connect: "ВОЙТИ И ПОДКЛЮЧИТЬ",
+    have_account: "Уже есть аккаунт?", new_here: "Впервые здесь?", sign_in_link: "Войти", create_one: "Создать",
+    forgot_pw: "Забыли пароль?", e2e_note: "Сквозное шифрование. Парольная фраза не покидает это устройство.",
+    signed_in: "Выполнен вход", sign_out: "ВЫЙТИ", enc_passphrase: "ПАРОЛЬНАЯ ФРАЗА",
+    ph_passphrase: "парольная фраза (одна на всех устройствах)", pp_default: "ею шифруется хранилище перед отправкой с устройства",
+    sync_now: "⟳ СИНХРОНИЗИРОВАТЬ", syncing: "⟳ СИНХРОНИЗАЦИЯ…", last_synced: "Синхронизировано {0}", not_synced: "Ещё не синхронизировано",
+    show_pw: "Показать пароль", hide_pw: "Скрыть пароль",
+    toast_enter_creds: "Введите почту и пароль", toast_pw_short: "Пароль минимум 6 символов",
+    toast_pw_mismatch: "Пароли не совпадают", toast_connected: "☁ подключено",
+    toast_enter_email: "Сначала введите почту", sending: "Отправляю…", reset_fail: "Не удалось отправить письмо сброса",
+    resend_sent: "✉ письмо отправлено повторно", resend_fail: "Не удалось отправить — попробуйте через минуту",
+    enter_passphrase: "Сначала введите парольную фразу", sync_failed: "Сбой синхронизации: {0}", vault_synced: "☁ хранилище синхронизировано",
+    onb_tagline: "SESSIONVAULT — МЕНЕДЖЕР ВКЛАДОК", onb_hero: "Тысяча вкладок.\nОдно хранилище.",
+    onb_hero_sub: "SessionVault сворачивает открытые вкладки в аккуратные сессии — и возвращает их одним кликом.",
+    onb1_t: "Один клик — и тишина",
+    onb1_b: "SessionVault сворачивает все открытые вкладки в аккуратные сессии — и возвращает одним кликом. Дай браузеру вздохнуть.",
+    onb2_t: "Порядок наводится сам",
+    onb2_b: "Теги, поиск и папки. Перетаскивай сессии по столу и раскладывай по полкам, как карточки на доске.",
+    onb3_t: "Везде, где ты есть",
+    onb3_b: "Сессии синхронизируются со сквозным шифрованием между устройствами. Дом, работа, дорога — хранилище всегда под рукой.",
+    onb_get_started_q: "Начнём?", onb_get_started: "Начать →", skip: "Пропустить", scroll_more: "листай, чтобы узнать больше",
+    onb_click: "КЛИК", onb_collected: "собрано", tag_work: "работа", tag_research: "учёба",
+  },
+};
+function t(key, ...args) {
+  const dict = I18N[prefs && prefs.lang === 'ru' ? 'ru' : 'en'];
+  let s = (dict && dict[key]) ?? I18N.en[key] ?? key;
+  return args.length ? s.replace(/\{(\d+)\}/g, (_, i) => args[i] ?? '') : s;
+}
+
 function domainOf(url) {
   try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url || ''; }
 }
@@ -25,11 +177,11 @@ function colorFor(str) {
 function ageOf(ms) {
   const d = Date.now() - ms;
   const m = Math.floor(d / 60000), h = Math.floor(d / 3.6e6), day = Math.floor(d / 8.64e7);
-  if (day > 1) return `${day} days ago`;
-  if (day === 1) return 'yesterday';
-  if (h >= 1) return `${h}h ago`;
-  if (m >= 1) return `${m}m ago`;
-  return 'just now';
+  if (day > 1) return t('age_days', day);
+  if (day === 1) return t('age_yesterday');
+  if (h >= 1) return t('age_h', h);
+  if (m >= 1) return t('age_m', m);
+  return t('age_now');
 }
 
 // default desk slots for stacks, by index
@@ -43,7 +195,7 @@ const UNFILED = '__unfiled__';
 
 // ── local UI prefs (theme/texture/motion/behaviour) ─────────────────────────────
 const PREFS_KEY = 'sv_app_prefs';
-const DEFAULT_PREFS = { theme: 'light', texture: 'grain', reduceMotion: false, confirmTrash: false, autoRestack: true };
+const DEFAULT_PREFS = { theme: 'light', texture: 'grain', reduceMotion: false, confirmTrash: false, autoRestack: true, lang: 'en' };
 function loadPrefs() {
   try { return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; } catch { return { ...DEFAULT_PREFS }; }
 }
@@ -52,6 +204,8 @@ function applyPrefs() {
   app.dataset.theme = prefs.theme;
   app.dataset.texture = prefs.texture;
   app.dataset.reduce = prefs.reduceMotion ? '1' : '0';
+  app.dataset.lang = prefs.lang;
+  try { document.documentElement.lang = prefs.lang; } catch {}
 }
 
 // stack positions per shelf (UI-local, the prototype's tactile arrangement)
@@ -106,7 +260,7 @@ const recovery = () => state.recovery || { available: false };
 
 // shelves = Unfiled + every folder, each with its sessions
 function shelves() {
-  const list = [{ id: UNFILED, name: 'Unfiled', color: 'var(--sub)' }];
+  const list = [{ id: UNFILED, name: t('unfiled'), color: 'var(--sub)' }];
   for (const f of Object.values(state.folders)) list.push({ id: f.id, name: f.name, color: f.color || colorFor(f.name) });
   return list.map((sh) => ({
     ...sh,
@@ -128,7 +282,7 @@ let toastTimer = null, undoFn = null;
 function toast(msg, undo) {
   undoFn = undo || null;
   const el = $('#toast');
-  el.innerHTML = `<span>${esc(msg)}</span>` + (undo ? `<button id="toast-undo">UNDO</button>` : '');
+  el.innerHTML = `<span>${esc(msg)}</span>` + (undo ? `<button id="toast-undo">${t('undo')}</button>` : '');
   el.hidden = false;
   if (undo) $('#toast-undo', el).onclick = async () => { el.hidden = true; clearTimeout(toastTimer); const f = undoFn; undoFn = null; if (f) await f(); };
   clearTimeout(toastTimer);
@@ -145,33 +299,34 @@ function render() {
 
   app.innerHTML = `
     <div class="rail">
-      <button class="rail-arrow tactile" id="flip-prev" title="Previous shelf">‹</button>
+      <button class="rail-arrow tactile" id="flip-prev" title="${t('prev_shelf')}">‹</button>
       <div class="rail-tabs" id="rail-tabs">
         ${shs.map((sh) => `
           <button class="tab${sh.id === active.id ? ' on' : ''}" data-shelf="${esc(sh.id)}">
             <span class="dot" style="background:${esc(sh.color)}"></span>${esc(sh.name)}
             <span class="count mono">${sh.sessions.length}</span>
           </button>`).join('')}
-        <button class="tab-add" id="add-folder" title="New shelf">+</button>
+        <button class="tab-add" id="add-folder" title="${t('new_shelf')}">+</button>
       </div>
-      <button class="rail-arrow tactile" id="flip-next" title="Next shelf">›</button>
+      <button class="rail-arrow tactile" id="flip-next" title="${t('next_shelf')}">›</button>
     </div>
 
     <div class="desk">
       <div class="head">
         <div>
           <h1 class="black">SESSIONVAULT</h1>
-          <div class="meta mono"><b style="color:${esc(active.color)}">${esc(active.name.toUpperCase())}</b> · ${sessions.length} SESSIONS · ${totalTabs} TABS</div>
+          <div class="meta mono"><b style="color:${esc(active.color)}">${esc(active.name.toUpperCase())}</b> · ${sessions.length} ${t('sessions')} · ${totalTabs} ${t('tabs')}</div>
         </div>
         <div class="head-actions">
-          <div class="searchbox"><span>⌕</span><input id="search" class="mono" placeholder="SEARCH…" value="${esc(query)}" /></div>
-          <button class="btn-squash tactile" id="squash">＋ SAVE OPEN TABS</button>
+          <div class="searchbox"><span>⌕</span><input id="search" class="mono" placeholder="${t('search')}" value="${esc(query)}" /></div>
+          <button class="btn-squash tactile" id="squash">${t('save_open')}</button>
           <div class="limit-chip mono" data-level="${limitLevel()}" id="limit-chip"
-               title="${isPro() ? 'Pro — unlimited saved sessions' : `${savedCount()} of ${freeLimit()} free saved sessions`}">
+               title="${isPro() ? t('chip_pro_title') : t('chip_free_title', savedCount(), freeLimit())}">
             ${isPro() ? '∞ PRO' : `${savedCount()}<span class="sep">/</span>${freeLimit()}`}
           </div>
-          <button class="btn-gear tactile" id="cloud" title="Cloud sync">☁</button>
-          <button class="btn-gear tactile" id="gear" title="Settings">⚙</button>
+          <button class="btn-gear btn-lang tactile mono" id="lang" title="${t('language')}">${prefs.lang === 'ru' ? 'RU' : 'EN'}</button>
+          <button class="btn-gear tactile" id="cloud" title="${t('cloud_sync')}">☁</button>
+          <button class="btn-gear tactile" id="gear" title="${t('settings')}">⚙</button>
         </div>
       </div>
 
@@ -179,19 +334,19 @@ function render() {
       <div class="recover-banner" id="recover-banner">
         <span class="rb-ico">↩</span>
         <div class="rb-text">
-          <b>Did your browser close unexpectedly?</b>
-          <span class="rb-sub mono">${recovery().missingCount} of ${recovery().tabCount} tabs from before aren't open — bring them back.</span>
+          <b>${t('crash_q')}</b>
+          <span class="rb-sub mono">${t('crash_sub', recovery().missingCount, recovery().tabCount)}</span>
         </div>
         <span style="flex:1"></span>
-        <button class="rb-do tactile" id="recover-do">↩ RECOVER ${recovery().missingCount} TABS</button>
-        <button class="rb-x tactile" id="recover-x" title="Dismiss">×</button>
+        <button class="rb-do tactile" id="recover-do">${t('recover_n', recovery().missingCount)}</button>
+        <button class="rb-x tactile" id="recover-x" title="${t('dismiss')}">×</button>
       </div>` : ''}
 
-      <div class="stats-stamp mono">${st ? `${st.totalTabs} TABS KEPT ★ ${st.sessions.total} SESSIONS` : 'SESSIONVAULT'}</div>
+      <div class="stats-stamp mono">${st ? t('stamp', st.totalTabs, st.sessions.total) : 'SESSIONVAULT'}</div>
 
       <div class="trash-corner mono" id="trash-corner">
-        <span class="big">⌫</span><span>DROP TO DELETE</span>
-        <span style="opacity:.6">(${Object.keys(state.sessions).length === 0 ? 0 : ''}BIN)</span>
+        <span class="big">⌫</span><span>${t('drop_delete')}</span>
+        <span style="opacity:.6">(${t('bin')})</span>
       </div>
 
       <div class="stacks slidein" id="stacks" key="${esc(active.id)}">
@@ -200,8 +355,8 @@ function render() {
 
       ${sessions.length === 0 ? `
         <div class="empty">
-          <div class="h hand">this shelf is bare</div>
-          <div class="b hand">Save your open tabs into a stack with “Save open tabs”.</div>
+          <div class="h hand">${t('empty_h')}</div>
+          <div class="b hand">${t('empty_b')}</div>
         </div>` : ''}
     </div>
 
@@ -236,10 +391,10 @@ function stackHTML(s, i) {
         <div class="strip" style="background:${esc(strip)}"></div>
         <div class="body">
           <div class="title">${esc(s.name)}</div>
-          <div class="sub mono">${s.tabs.length} TABS · ${esc(ageOf(s.createdAt).toUpperCase())}</div>
+          <div class="sub mono">${s.tabs.length} ${t('tabs')} · ${esc(ageOf(s.createdAt).toUpperCase())}</div>
         </div>
         <div class="acts">
-          <button class="actbtn" data-act="restore" data-id="${esc(s.id)}">↗ ALL</button>
+          <button class="actbtn" data-act="restore" data-id="${esc(s.id)}">${t('restore_all')}</button>
           <button class="actbtn" data-act="share" data-id="${esc(s.id)}">⤴</button>
           <button class="actbtn" data-act="trash" data-id="${esc(s.id)}">×</button>
         </div>
@@ -265,12 +420,17 @@ function wireDesk() {
   $('#squash').onclick = onSquash;
   $('#gear').onclick = () => { settingsOpen = true; renderSettings(); };
   $('#cloud').onclick = () => { syncOpen = true; renderSync(); };
+  $('#lang').onclick = () => {
+    prefs.lang = prefs.lang === 'ru' ? 'en' : 'ru'; savePrefs(); applyPrefs();
+    render();
+    if ($('#overlay-onb')) renderOnboarding(); // onboarding isn't re-rendered by render()
+  };
   $('#trash-corner').onclick = () => { trashOpen = true; renderTrashOverlay(); };
 
   // crash-recovery banner
   const rdo = $('#recover-do'), rx = $('#recover-x');
   if (rdo) rdo.onclick = onRecover;
-  if (rx) rx.onclick = async () => { await api.dismissRecovery(); state.recovery = { available: false }; render(); toast('Recovery dismissed'); };
+  if (rx) rx.onclick = async () => { await api.dismissRecovery(); state.recovery = { available: false }; render(); toast(t('recovery_dismissed')); };
 
   // stack action buttons (don't start a drag)
   app.querySelectorAll('.actbtn').forEach((b) => {
@@ -342,59 +502,59 @@ async function onStackAct(act, id, viaDrop) {
   if (!s) return;
   if (act === 'restore') {
     await api.restoreSession(id);
-    toast(`↗ ${s.tabs.length} tabs restored — opening windows`);
+    toast(t('restored_tabs', s.tabs.length));
     return;
   }
   if (act === 'share') {
     const text = await api.exportSessionText(id);
     try { await navigator.clipboard.writeText(text); } catch {}
-    toast('⤴ tab list copied to clipboard');
+    toast(t('copied'));
     return;
   }
   if (act === 'trash') {
-    if (prefs.confirmTrash && !viaDrop && !confirm(`Delete “${s.name}” (${s.tabs.length} tabs)?`)) return;
+    if (prefs.confirmTrash && !viaDrop && !confirm(t('confirm_delete', s.name, s.tabs.length))) return;
     await api.deleteSession(id);
     spreadId = null;
     await refresh();
-    toast(`“${s.name}” moved to the bin`, async () => { await api.restoreFromTrash(id); await refresh(); });
+    toast(t('moved_bin', s.name), async () => { await api.restoreFromTrash(id); await refresh(); });
   }
 }
 
 async function onRecover() {
-  const btn = $('#recover-do'); if (btn) { btn.disabled = true; btn.textContent = '↩ RECOVERING…'; }
+  const btn = $('#recover-do'); if (btn) { btn.disabled = true; btn.textContent = t('recovering'); }
   try {
     const s = await api.recoverLast(); // clears the candidate in the engine
     if (s) {
       activeShelf = UNFILED;
       await refresh(); // re-peeks recovery → banner goes away
-      toast(`↩ recovered ${s.tabs.length} tabs into a new session`);
+      toast(t('recovered', s.tabs.length));
     } else {
       await refresh();
-      toast('Nothing to recover — no snapshot from a previous session');
+      toast(t('nothing_recover'));
     }
   } catch (err) {
     render();
-    toast('Could not recover: ' + err.message);
+    toast(t('recover_fail', err.message));
   }
 }
 
 async function onSquash() {
-  const name = prompt('Name this session:', `Session — ${new Date().toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
+  const name = prompt(t('name_session'), t('session_default', new Date().toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })));
   if (name === null) return;
   try {
     const folderId = activeShelf === UNFILED ? null : activeShelf;
-    const s = await api.saveSession(name || 'Open tabs', folderId);
+    const s = await api.saveSession(name || t('open_tabs_fallback'), folderId);
     if (s && folderId && s.folderId !== folderId) await api.moveSessionToFolder(s.id, folderId);
     await refresh();
-    toast('✓ open tabs saved as a new session');
+    toast(t('saved_ok'));
   } catch (err) {
-    if (String(err.message).startsWith('FREE_LIMIT_REACHED')) toast('Free limit reached (50). Delete some or upgrade to Pro.');
-    else toast('Could not save: ' + err.message);
+    if (String(err.message).startsWith('FREE_LIMIT_REACHED')) toast(t('free_limit'));
+    else toast(t('save_fail', err.message));
   }
 }
 
 async function onAddFolder() {
-  const name = prompt('New shelf name:');
+  const name = prompt(t('new_shelf_name'));
   if (!name || !name.trim()) return;
   const f = await api.createFolder(name.trim(), colorFor(name));
   await refresh();
@@ -414,12 +574,12 @@ function renderSpread() {
   ov.innerHTML = `
     <div class="overlay-head" data-stop>
       <span class="overlay-title black" style="border-bottom:6px solid ${esc(strip)}">${esc(s.name)}</span>
-      <span class="overlay-sub mono">${s.tabs.length} cards dealt</span>
+      <span class="overlay-sub mono">${t('cards_dealt', s.tabs.length)}</span>
       <span style="flex:1"></span>
-      <button class="actbtn" data-sp="restore">↗ RESTORE ALL</button>
-      <button class="actbtn" data-sp="share">⤴ SHARE</button>
-      <button class="actbtn" data-sp="trash">× BIN IT</button>
-      <button class="actbtn" data-sp="close">RESTACK ↩</button>
+      <button class="actbtn" data-sp="restore">${t('restore_all_btn')}</button>
+      <button class="actbtn" data-sp="share">${t('share_btn')}</button>
+      <button class="actbtn" data-sp="trash">${t('bin_it')}</button>
+      <button class="actbtn" data-sp="close">${t('restack')}</button>
     </div>
     <div class="cards" data-stop>
       ${s.tabs.map((tb, i) => `
@@ -428,11 +588,11 @@ function renderSpread() {
           <div class="ctitle">${esc(tb.title || domainOf(tb.url))}</div>
           <div class="crow">
             <span class="cdom mono">${esc(domainOf(tb.url))}</span>
-            <span class="cdacts"><button class="ico" data-open="${esc(tb.url)}" title="Open this tab">↗</button></span>
+            <span class="cdacts"><button class="ico" data-open="${esc(tb.url)}" title="${t('open_this')}">↗</button></span>
           </div>
         </div>`).join('')}
     </div>
-    <div class="mono" style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:.2em;color:var(--sub)">CLICK ANYWHERE TO RESTACK</div>
+    <div class="mono" style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:.2em;color:var(--sub)">${t('click_restack')}</div>
   `;
   ov.hidden = false;
   ov.onpointerdown = (e) => { ov._downSelf = (e.target === ov); };
@@ -443,7 +603,7 @@ function renderSpread() {
     if (a === 'restore' || a === 'share' || a === 'trash') { await onStackAct(a, s.id); if (a !== 'trash') closeSpread(); }
   });
   ov.querySelectorAll('[data-open]').forEach((b) => b.onclick = async (e) => {
-    e.stopPropagation(); await api.restoreTab(b.dataset.open); toast('↗ tab opened');
+    e.stopPropagation(); await api.restoreTab(b.dataset.open); toast(t('tab_opened'));
   });
 }
 function closeSpread() { spreadId = null; const ov = $('#overlay-spread'); if (ov) ov.remove(); }
@@ -456,19 +616,19 @@ async function renderTrashOverlay() {
   if (!ov) { ov = document.createElement('div'); ov.id = 'overlay-trash'; ov.className = 'overlay'; app.appendChild(ov); }
   ov.innerHTML = `
     <div class="overlay-head" data-stop>
-      <span class="overlay-title black">THE BIN</span>
-      <span class="overlay-sub mono">${entries.length} sessions deleted</span>
+      <span class="overlay-title black">${t('the_bin')}</span>
+      <span class="overlay-sub mono">${t('sessions_deleted', entries.length)}</span>
       <span style="flex:1"></span>
-      ${entries.length ? '<button class="actbtn" data-tr="empty">EMPTY FOR GOOD</button>' : ''}
-      <button class="actbtn" data-tr="close">BACK ↩</button>
+      ${entries.length ? `<button class="actbtn" data-tr="empty">${t('empty_good')}</button>` : ''}
+      <button class="actbtn" data-tr="close">${t('back')}</button>
     </div>
     <div class="cards" data-stop>
-      ${entries.length === 0 ? '<div class="hand" style="font-size:34px;opacity:.5">Bin is empty.</div>' : ''}
+      ${entries.length === 0 ? `<div class="hand" style="font-size:34px;opacity:.5">${t('bin_empty')}</div>` : ''}
       ${entries.map((s, i) => `
         <div class="trash-card" style="animation-delay:${i * 0.04}s; transform:rotate(${(i % 3) - 1}deg)">
           <div class="tname black">${esc(s.name)}</div>
-          <div class="mono" style="font-size:9px;letter-spacing:.12em;color:var(--sub);flex:1">${s.tabs.length} TABS</div>
-          <button class="actbtn" style="align-self:flex-start" data-putback="${esc(s.id)}">↩ RESTORE</button>
+          <div class="mono" style="font-size:9px;letter-spacing:.12em;color:var(--sub);flex:1">${s.tabs.length} ${t('tabs')}</div>
+          <button class="actbtn" style="align-self:flex-start" data-putback="${esc(s.id)}">${t('restore_btn')}</button>
         </div>`).join('')}
     </div>`;
   ov.hidden = false;
@@ -476,11 +636,11 @@ async function renderTrashOverlay() {
   ov.onclick = (e) => { if (ov._downSelf && !e.target.closest('[data-stop]')) closeTrash(); };
   ov.querySelectorAll('[data-tr]').forEach((b) => b.onclick = async () => {
     if (b.dataset.tr === 'close') return closeTrash();
-    if (b.dataset.tr === 'empty') { await api.emptyTrash(); renderTrashOverlay(); toast('Bin emptied'); }
+    if (b.dataset.tr === 'empty') { await api.emptyTrash(); renderTrashOverlay(); toast(t('bin_emptied')); }
   });
   ov.querySelectorAll('[data-putback]').forEach((b) => b.onclick = async () => {
     await api.restoreFromTrash(b.dataset.putback); await loadData(); renderTrashOverlay(); render(); renderTrashOverlay();
-    toast('restored to the shelf');
+    toast(t('restored_shelf'));
   });
 }
 function closeTrash() { trashOpen = false; const ov = $('#overlay-trash'); if (ov) ov.remove(); }
@@ -490,27 +650,27 @@ function renderSettings() {
   const s = state.settings;
   let ov = $('#overlay-settings');
   if (!ov) { ov = document.createElement('div'); ov.id = 'overlay-settings'; ov.className = 'modal-center'; app.appendChild(ov); }
-  const seg = (key, opts) => `<div class="seg">${opts.map((o) => `<button class="${prefs[key] === o ? 'on' : ''}" data-seg="${key}" data-val="${o}">${o}</button>`).join('')}</div>`;
+  const seg = (key, opts) => `<div class="seg">${opts.map(([v, label]) => `<button class="${prefs[key] === v ? 'on' : ''}" data-seg="${key}" data-val="${v}">${label}</button>`).join('')}</div>`;
   const toggle = (key, on) => `<button class="toggle ${on ? 'on' : ''}" data-toggle="${key}"><i></i></button>`;
   ov.innerHTML = `
     <div class="modal">
       <div class="modal-head">
-        <span class="black" style="font-size:34px">SETTINGS</span>
+        <span class="black" style="font-size:34px">${t('settings_title')}</span>
         <span style="flex:1"></span>
-        <button class="actbtn" data-replay>↻ REPLAY INTRO</button>
-        <button class="actbtn" data-done>DONE ↩</button>
+        <button class="actbtn" data-replay>${t('replay_intro')}</button>
+        <button class="actbtn" data-done>${t('done')}</button>
       </div>
 
-      <div class="set-section mono">APPEARANCE</div>
-      <div class="set-row"><div class="label"><div class="l">Theme</div><div class="h mono">Light desk or midnight desk</div></div>${seg('theme', ['light', 'dark'])}</div>
-      <div class="set-row"><div class="label"><div class="l">Desk texture</div><div class="h mono">The grain under your stacks</div></div>${seg('texture', ['grain', 'linen', 'clean'])}</div>
-      <div class="set-row"><div class="label"><div class="l">Reduce motion</div><div class="h mono">Calm the springs and shuffles</div></div>${toggle('reduceMotion', prefs.reduceMotion)}</div>
+      <div class="set-section mono">${t('appearance')}</div>
+      <div class="set-row"><div class="label"><div class="l">${t('theme')}</div><div class="h mono">${t('theme_h')}</div></div>${seg('theme', [['light', t('theme_light')], ['dark', t('theme_dark')]])}</div>
+      <div class="set-row"><div class="label"><div class="l">${t('texture')}</div><div class="h mono">${t('texture_h')}</div></div>${seg('texture', [['grain', t('tex_grain')], ['linen', t('tex_linen')], ['clean', t('tex_clean')]])}</div>
+      <div class="set-row"><div class="label"><div class="l">${t('reduce_motion')}</div><div class="h mono">${t('reduce_h')}</div></div>${toggle('reduceMotion', prefs.reduceMotion)}</div>
 
-      <div class="set-section mono">BEHAVIOUR</div>
-      <div class="set-row"><div class="label"><div class="l">Confirm before binning</div><div class="h mono">Ask first when you delete a stack</div></div>${toggle('confirmTrash', prefs.confirmTrash)}</div>
-      <div class="set-row"><div class="label"><div class="l">Autosave open tabs</div><div class="h mono">Periodically snapshot your tabs (Pro)</div></div>${toggle('autosaveEnabled', !!s.autosaveEnabled)}</div>
-      <div class="set-row"><div class="label"><div class="l">Autosave interval</div><div class="h mono">Minutes between snapshots</div></div><input class="num mono" id="set-interval" type="number" min="1" max="1440" value="${esc(s.autosaveInterval ?? 10)}" /></div>
-      <div class="set-row"><div class="label"><div class="l">Keep autosaves</div><div class="h mono">How many snapshots to retain</div></div><input class="num mono" id="set-maxauto" type="number" min="1" max="100" value="${esc(s.maxAutoSessions ?? 5)}" /></div>
+      <div class="set-section mono">${t('behaviour')}</div>
+      <div class="set-row"><div class="label"><div class="l">${t('confirm_bin')}</div><div class="h mono">${t('confirm_bin_h')}</div></div>${toggle('confirmTrash', prefs.confirmTrash)}</div>
+      <div class="set-row"><div class="label"><div class="l">${t('autosave')}</div><div class="h mono">${t('autosave_h')}</div></div>${toggle('autosaveEnabled', !!s.autosaveEnabled)}</div>
+      <div class="set-row"><div class="label"><div class="l">${t('autosave_int')}</div><div class="h mono">${t('autosave_int_h')}</div></div><input class="num mono" id="set-interval" type="number" min="1" max="1440" value="${esc(s.autosaveInterval ?? 10)}" /></div>
+      <div class="set-row"><div class="label"><div class="l">${t('keep_auto')}</div><div class="h mono">${t('keep_auto_h')}</div></div><input class="num mono" id="set-maxauto" type="number" min="1" max="100" value="${esc(s.maxAutoSessions ?? 5)}" /></div>
     </div>`;
   ov.hidden = false;
   ov.onpointerdown = (e) => { ov._downSelf = (e.target === ov); };
@@ -555,10 +715,10 @@ async function renderSync() {
       <div class="sync-info">
         <span class="si-ico">✉</span>
         <div class="si-text">
-          <b>Almost there — confirm your email</b>
-          <span class="si-body">We sent a link to <b>${esc(confirmEmail)}</b>. Open it, tap “Confirm email”, then sign in.</span>
-          <span class="si-hint mono">Don't see it? Check Spam and Promotions — it can take a minute to arrive.</span>
-          <button class="si-resend mono" id="sync-resend">↻ Resend email</button>
+          <b>${t('confirm_almost')}</b>
+          <span class="si-body">${t('confirm_body', esc(confirmEmail))}</span>
+          <span class="si-hint mono">${t('confirm_hint')}</span>
+          <button class="si-resend mono" id="sync-resend">${t('resend')}</button>
         </div>
       </div>` : '';
     // Forgot-password success: Supabase accepted the reset request and (if the
@@ -567,9 +727,9 @@ async function renderSync() {
       <div class="sync-info">
         <span class="si-ico">🔑</span>
         <div class="si-text">
-          <b>Check your inbox</b>
-          <span class="si-body">We sent a password-reset link to <b>${esc(resetSentEmail)}</b>. Open it to set a new password, then sign in here.</span>
-          <span class="si-hint mono">No email? Check Spam — and make sure it's the address you signed up with.</span>
+          <b>${t('check_inbox')}</b>
+          <span class="si-body">${t('reset_body', esc(resetSentEmail))}</span>
+          <span class="si-hint mono">${t('reset_hint')}</span>
         </div>
       </div>` : '';
     const isSignup = syncMode === 'signup';
@@ -578,53 +738,53 @@ async function renderSync() {
     const confirmPwInput = isSignup ? `
       <div class="pw2-wrap" id="pw2-wrap">
         <div class="pw2-inner">
-          <input id="sync-pw2" class="sync-input mono" type="password" placeholder="confirm password" autocomplete="new-password" />
+          <input id="sync-pw2" class="sync-input mono" type="password" placeholder="${t('ph_confirm_pw')}" autocomplete="new-password" />
         </div>
       </div>` : '';
     // Sign-in only: a way out when the account password is forgotten.
     const forgotLink = !isSignup ? `
       <div class="sync-foot mono" style="margin-top:8px">
-        <button class="sync-link" id="sync-forgot">Forgot password?</button>
+        <button class="sync-link" id="sync-forgot">${t('forgot_pw')}</button>
       </div>` : '';
     body = `
-      <div class="set-section mono">${isSignup ? 'CREATE ACCOUNT' : 'SIGN IN'}</div>
+      <div class="set-section mono">${isSignup ? t('create_account') : t('sign_in')}</div>
       ${confirmBlock}
       ${resetBlock}
-      <input id="sync-email" class="sync-input mono" type="email" placeholder="email" autocomplete="username" value="${esc(syncEmail)}" />
+      <input id="sync-email" class="sync-input mono" type="email" placeholder="${t('ph_email')}" autocomplete="username" value="${esc(syncEmail)}" />
       <div class="sync-pw-wrap">
-        <input id="sync-pw" class="sync-input mono has-reveal" type="password" placeholder="password" autocomplete="${isSignup ? 'new-password' : 'current-password'}" />
-        <button type="button" class="pw-reveal" id="sync-pw-reveal" aria-label="Show password" title="Show password">${EYE_SHOW}</button>
+        <input id="sync-pw" class="sync-input mono has-reveal" type="password" placeholder="${t('ph_password')}" autocomplete="${isSignup ? 'new-password' : 'current-password'}" />
+        <button type="button" class="pw-reveal" id="sync-pw-reveal" aria-label="${t('show_pw')}" title="${t('show_pw')}">${EYE_SHOW}</button>
       </div>
-      <div class="sync-warn mono" id="sync-pw-warn" hidden>Use only English letters, numbers and symbols — no spaces, accents or non-Latin characters.</div>
+      <div class="sync-warn mono" id="sync-pw-warn" hidden>${t('pw_warn')}</div>
       ${confirmPwInput}
       ${forgotLink}
       ${errLine}
       <button class="btn-squash tactile" id="sync-connect" style="width:100%;margin-top:12px;transform:none">
-        ${isSignup ? 'CREATE ACCOUNT & CONNECT' : 'SIGN IN & CONNECT'}
+        ${isSignup ? t('create_connect') : t('signin_connect')}
       </button>
       <div class="sync-foot mono">
-        ${isSignup ? 'Have an account?' : 'New here?'}
-        <button class="sync-link" id="sync-toggle">${isSignup ? 'Sign in' : 'Create one'}</button>
+        ${isSignup ? t('have_account') : t('new_here')}
+        <button class="sync-link" id="sync-toggle">${isSignup ? t('sign_in_link') : t('create_one')}</button>
       </div>
-      <div class="sync-foot mono" style="opacity:.6">End-to-end encrypted. Your passphrase never leaves this device.</div>`;
+      <div class="sync-foot mono" style="opacity:.6">${t('e2e_note')}</div>`;
   } else {
     const a = await api.assessPassphrase(syncPass);
     const segs = Array.from({ length: 4 }).map((_, i) =>
       `<span style="background:${i < a.score ? STRENGTH_COLORS[a.score] : 'var(--paperEdge)'}"></span>`).join('');
     body = `
-      <div class="set-row"><div class="label"><div class="l">Signed in</div><div class="h mono">${esc(status.email || '')}</div></div>
-        <button class="actbtn" id="sync-out">SIGN OUT</button></div>
-      <div class="set-section mono">ENCRYPTION PASSPHRASE</div>
-      <input id="sync-pass" class="sync-input mono" type="password" placeholder="passphrase (same on every device)" value="${esc(syncPass)}" autocomplete="off" />
+      <div class="set-row"><div class="label"><div class="l">${t('signed_in')}</div><div class="h mono">${esc(status.email || '')}</div></div>
+        <button class="actbtn" id="sync-out">${t('sign_out')}</button></div>
+      <div class="set-section mono">${t('enc_passphrase')}</div>
+      <input id="sync-pass" class="sync-input mono" type="password" placeholder="${t('ph_passphrase')}" value="${esc(syncPass)}" autocomplete="off" />
       <div class="pp-bar" id="pp-bar">${segs}</div>
-      <div class="pp-label mono" id="pp-label">${syncPass ? esc(a.label) + (a.warnings[0] ? ' — ' + esc(a.warnings[0]) : '') : 'used to encrypt your vault before it leaves the device'}</div>
+      <div class="pp-label mono" id="pp-label">${syncPass ? esc(a.label) + (a.warnings[0] ? ' — ' + esc(a.warnings[0]) : '') : t('pp_default')}</div>
       ${errLine}
-      <button class="btn-squash tactile" id="sync-now" style="width:100%;margin-top:14px;transform:none">⟳ SYNC NOW</button>
-      <div class="sync-foot mono">${status.lastSync ? 'Last synced ' + esc(ageOf(status.lastSync)) : 'Not synced yet'} · ${esc(status.state)}</div>`;
+      <button class="btn-squash tactile" id="sync-now" style="width:100%;margin-top:14px;transform:none">${t('sync_now')}</button>
+      <div class="sync-foot mono">${status.lastSync ? t('last_synced', esc(ageOf(status.lastSync))) : t('not_synced')} · ${esc(status.state)}</div>`;
   }
 
   ov.innerHTML = `<div class="modal" style="width:420px">
-      <div class="modal-head"><span class="black" style="font-size:30px">CLOUD SYNC</span><span style="flex:1"></span><button class="actbtn" data-done>DONE ↩</button></div>
+      <div class="modal-head"><span class="black" style="font-size:30px">${t('cloud_sync_title')}</span><span style="flex:1"></span><button class="actbtn" data-done>${t('done')}</button></div>
       ${body}
     </div>`;
   ov.hidden = false;
@@ -638,16 +798,16 @@ async function renderSync() {
     const forgot = $('#sync-forgot', ov);
     if (forgot) forgot.onclick = async () => {
       const email = $('#sync-email', ov).value.trim();
-      if (!email) return toast('Enter your email first');
+      if (!email) return toast(t('toast_enter_email'));
       syncEmail = email;
-      forgot.disabled = true; forgot.textContent = 'Sending…';
+      forgot.disabled = true; forgot.textContent = t('sending');
       try {
         await api.recoverPassword(email);
         confirmEmail = null; resetSentEmail = email;
         renderSync();
       } catch (err) {
-        toast(String(err.message).replace(/^AUTH_FAILED:\s*/, '') || 'Could not send reset email');
-        forgot.disabled = false; forgot.textContent = 'Forgot password?';
+        toast(String(err.message).replace(/^AUTH_FAILED:\s*/, '') || t('reset_fail'));
+        forgot.disabled = false; forgot.textContent = t('forgot_pw');
       }
     };
 
@@ -661,7 +821,7 @@ async function renderSync() {
       const show = pw.type === 'password';
       pw.type = show ? 'text' : 'password';
       reveal.innerHTML = show ? EYE_HIDE : EYE_SHOW;
-      reveal.title = reveal.ariaLabel = show ? 'Hide password' : 'Show password';
+      reveal.title = reveal.ariaLabel = show ? t('hide_pw') : t('show_pw');
       pw.focus();
     };
     const syncPwUi = () => {
@@ -673,26 +833,26 @@ async function renderSync() {
 
     const resend = $('#sync-resend', ov);
     if (resend) resend.onclick = async () => {
-      resend.disabled = true; resend.textContent = '↻ Sending…';
-      try { await api.resendConfirmation(confirmEmail); toast('✉ confirmation email sent again'); }
-      catch { toast('Could not resend right now — try again in a minute'); }
-      finally { resend.disabled = false; resend.textContent = '↻ Resend email'; }
+      resend.disabled = true; resend.textContent = t('sending');
+      try { await api.resendConfirmation(confirmEmail); toast(t('resend_sent')); }
+      catch { toast(t('resend_fail')); }
+      finally { resend.disabled = false; resend.textContent = t('resend'); }
     };
     $('#sync-connect', ov).onclick = async () => {
       const email = $('#sync-email', ov).value.trim();
       const password = $('#sync-pw', ov).value;
-      if (!email || !password) return toast('Enter email and password');
+      if (!email || !password) return toast(t('toast_enter_creds'));
       if (hasBadChar(password)) { pwWarn.hidden = false; pw.focus(); return; }
       if (syncMode === 'signup') {
         // Confirm-password guard: catch typos before the account is created.
-        if (password.length < 6) return toast('Password must be at least 6 characters');
-        if (password !== $('#sync-pw2', ov).value) return toast('Passwords don’t match');
+        if (password.length < 6) return toast(t('toast_pw_short'));
+        if (password !== $('#sync-pw2', ov).value) return toast(t('toast_pw_mismatch'));
       }
       syncEmail = email;
       try {
         await api.setSyncEnabled(true, { email, password, signUp: syncMode === 'signup' });
         confirmEmail = null; resetSentEmail = null;
-        toast('☁ connected');
+        toast(t('toast_connected'));
         renderSync();
       } catch (err) {
         if (String(err.message).startsWith('AUTH_CONFIRM_REQUIRED')) {
@@ -714,15 +874,15 @@ async function renderSync() {
       const a = await api.assessPassphrase(syncPass);
       $('#pp-bar', ov).innerHTML = Array.from({ length: 4 }).map((_, i) =>
         `<span style="background:${i < a.score ? STRENGTH_COLORS[a.score] : 'var(--paperEdge)'}"></span>`).join('');
-      $('#pp-label', ov).textContent = syncPass ? a.label + (a.warnings[0] ? ' — ' + a.warnings[0] : '') : 'used to encrypt your vault before it leaves the device';
+      $('#pp-label', ov).textContent = syncPass ? a.label + (a.warnings[0] ? ' — ' + a.warnings[0] : '') : t('pp_default');
     };
     $('#sync-out', ov).onclick = async () => { await api.setSyncEnabled(false); syncPass = ''; renderSync(); };
     $('#sync-now', ov).onclick = async () => {
-      if (!syncPass) return toast('Enter your passphrase first');
-      $('#sync-now', ov).textContent = '⟳ SYNCING…';
+      if (!syncPass) return toast(t('enter_passphrase'));
+      $('#sync-now', ov).textContent = t('syncing');
       const st = await api.syncNow(syncPass);
       await loadData(); render(); renderSync();
-      toast(st && st.error ? 'Sync failed: ' + st.error : '☁ vault synced');
+      toast(st && st.error ? t('sync_failed', st.error) : t('vault_synced'));
     };
   }
 }
@@ -807,9 +967,9 @@ function onbArtCollect() {
   return `<div class="onb-art onb-collect">
     <div class="onb-art-inner">
       ${cards}
-      <div class="onb-clickzone"><span class="halo"></span><span class="zlabel mono">CLICK</span></div>
+      <div class="onb-clickzone"><span class="halo"></span><span class="zlabel mono">${t('onb_click')}</span></div>
       <span class="onb-cursor">${CURSOR_SVG}</span>
-      <div class="onb-collected mono"><span class="onb-check">${CHECK}</span>collected</div>
+      <div class="onb-collected mono"><span class="onb-check">${CHECK}</span>${t('onb_collected')}</div>
     </div></div>`;
 }
 
@@ -824,7 +984,7 @@ function onbArtSort() {
   ].map((cd, i) => onbMiniCard(cd.c,
     `--sx:${cd.s[0]}%;--sy:${cd.s[1]}%;--r:${cd.s[2]}deg;--gx:${cd.g[0]}%;--gy:${cd.g[1]}%;--d:${i * 50}ms;z-index:${i}`,
     'sortable')).join('');
-  const tags = [{ c: A, x: 27, k: 'work' }, { c: B, x: 73, k: 'research' }].map((g, i) =>
+  const tags = [{ c: A, x: 27, k: t('tag_work') }, { c: B, x: 73, k: t('tag_research') }].map((g, i) =>
     `<span class="onb-tag onb-sort-tag" style="left:${g.x}%;top:6%;color:${g.c};border-color:color-mix(in srgb, ${g.c} 45%, transparent);--d:${350 + i * 80}ms"><span class="d" style="background:${g.c}"></span>${g.k}</span>`).join('');
   return `<div class="onb-art onb-sort">
     <div class="onb-art-inner">${tags}${cards}</div></div>`;
@@ -865,29 +1025,29 @@ function renderOnboarding() {
       <div class="onb-stage">
         <div class="onb-sec onb-sec-hero">
           <div>
-            <div class="onb-micro mono onb-r" style="--d:0ms">SESSIONVAULT — TAB MANAGER</div>
-            <h1 class="onb-h1">${onbWords('A thousand tabs.\nOne vault.', 120, 75)}</h1>
-            <p class="onb-sub onb-r" style="--d:520ms; margin-inline:auto">SessionVault collapses your open tabs into tidy sessions — and brings them back in one click.</p>
+            <div class="onb-micro mono onb-r" style="--d:0ms">${t('onb_tagline')}</div>
+            <h1 class="onb-h1">${onbWords(t('onb_hero'), 120, 75)}</h1>
+            <p class="onb-sub onb-r" style="--d:520ms; margin-inline:auto">${t('onb_hero_sub')}</p>
             <div class="onb-r" style="--d:680ms; margin-top:18px">${onbArt('fan')}</div>
           </div>
         </div>
-        ${step('01', 'One click — then silence', 'SessionVault collapses all your open tabs into tidy sessions — and brings them back in one click. Let your browser breathe.', onbArtCollect())}
-        ${step('02', 'Order finds itself', 'Tags, search and folders. Drag sessions around the desk and file them into shelves like cards on a board.', onbArtSort())}
-        ${step('03', 'Everywhere you go', 'Sessions sync, end-to-end encrypted, across your devices. Home, work, on the road — your vault is always at hand.', onbArtSync())}
+        ${step('01', t('onb1_t'), t('onb1_b'), onbArtCollect())}
+        ${step('02', t('onb2_t'), t('onb2_b'), onbArtSort())}
+        ${step('03', t('onb3_t'), t('onb3_b'), onbArtSync())}
         <div class="onb-sec onb-sec-cta">
           <div class="onb-cta-inner">
             <div class="onb-wordmark mono onb-r" style="--d:40ms">SESSIONVAULT</div>
-            <h2 class="onb-h1">${onbWords('Get started?', 140, 80)}</h2>
-            <button class="onb-next onb-r" id="onb-start" style="--d:480ms">Get started →</button>
+            <h2 class="onb-h1">${onbWords(t('onb_get_started_q'), 140, 80)}</h2>
+            <button class="onb-next onb-r" id="onb-start" style="--d:480ms">${t('onb_get_started')}</button>
           </div>
         </div>
       </div>
     </div>
 
     <div class="onb-logo mono">SESSIONVAULT</div>
-    <button class="onb-skip" id="onb-skip">Skip</button>
+    <button class="onb-skip" id="onb-skip">${t('skip')}</button>
     <div class="onb-rail mono"><span id="onb-rail-cur">01</span><span class="bar"><i id="onb-rail-fill"></i></span><span>0${ONB_SECTIONS}</span></div>
-    <div class="onb-hint mono" id="onb-hint"><span class="line"></span> scroll to discover more</div>
+    <div class="onb-hint mono" id="onb-hint"><span class="line"></span> ${t('scroll_more')}</div>
   `;
   ov.hidden = false;
 

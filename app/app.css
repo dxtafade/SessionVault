@@ -109,6 +109,7 @@ body { background: var(--desk, #E9E1D2); }
   font-family: "Space Mono", monospace; transform: rotate(1deg); box-shadow: 3px 3px 0 var(--sub);
 }
 .btn-gear { border: 2px solid var(--ink); background: var(--paper); color: var(--ink); border-radius: 50%; width: 42px; height: 42px; font-size: 16px; }
+.btn-lang { font-family: "Space Mono", monospace; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
 
 /* free-plan saved-sessions counter (Option A: visible 50-session cap) */
 .limit-chip {

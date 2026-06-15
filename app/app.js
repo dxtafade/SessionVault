@@ -64,6 +64,9 @@ const I18N = {
     resend: "↻ Resend email", check_inbox: "Check your inbox",
     reset_body: "We sent a password-reset link to <b>{0}</b>. Open it to set a new password, then sign in here.",
     reset_hint: "No email? Check Spam — and make sure it's the address you signed up with.",
+    reset_title: "RESET PASSWORD", back_signin: "← Back to sign in",
+    send_reset: "SEND RESET LINK", resend_reset: "RESEND RESET LINK",
+    reset_lead: "Enter your account email — we'll send a link to set a new password. Your encryption passphrase is separate and isn't changed here.",
     ph_email: "email", ph_password: "password", ph_confirm_pw: "confirm password",
     pw_warn: "Use only English letters, numbers and symbols — no spaces, accents or non-Latin characters.",
     create_connect: "CREATE ACCOUNT & CONNECT", signin_connect: "SIGN IN & CONNECT",
@@ -134,6 +137,9 @@ const I18N = {
     resend: "↻ Отправить снова", check_inbox: "Проверьте почту",
     reset_body: "Мы отправили ссылку для сброса на <b>{0}</b>. Откройте её, задайте новый пароль и войдите здесь.",
     reset_hint: "Нет письма? Проверьте Спам — и что это та почта, на которую регистрировались.",
+    reset_title: "СБРОС ПАРОЛЯ", back_signin: "← Назад ко входу",
+    send_reset: "ОТПРАВИТЬ ССЫЛКУ", resend_reset: "ОТПРАВИТЬ СНОВА",
+    reset_lead: "Введите почту аккаунта — пришлём ссылку для нового пароля. Парольная фраза шифрования отдельная и здесь не меняется.",
     ph_email: "почта", ph_password: "пароль", ph_confirm_pw: "повторите пароль",
     pw_warn: "Только латинские буквы, цифры и символы — без пробелов, акцентов и не-латинских символов.",
     create_connect: "СОЗДАТЬ И ПОДКЛЮЧИТЬ", signin_connect: "ВОЙТИ И ПОДКЛЮЧИТЬ",
@@ -707,7 +713,30 @@ async function renderSync() {
 
   const errLine = status.error ? `<div class="sync-err mono">${esc(status.error)}</div>` : '';
   let body;
-  if (!status.enabled) {
+  if (!status.enabled && syncMode === 'forgot') {
+    // Dedicated password-recovery screen — its own view, not inline in sign-in.
+    const resetBlock = resetSentEmail ? `
+      <div class="sync-info">
+        <span class="si-ico">🔑</span>
+        <div class="si-text">
+          <b>${t('check_inbox')}</b>
+          <span class="si-body">${t('reset_body', esc(resetSentEmail))}</span>
+          <span class="si-hint mono">${t('reset_hint')}</span>
+        </div>
+      </div>` : '';
+    body = `
+      <div class="set-section mono">${t('reset_title')}</div>
+      <p class="sync-lead mono">${t('reset_lead')}</p>
+      ${resetBlock}
+      <input id="sync-email" class="sync-input mono" type="email" placeholder="${t('ph_email')}" autocomplete="username" value="${esc(syncEmail)}" />
+      ${errLine}
+      <button class="btn-squash tactile" id="sync-reset-send" style="width:100%;margin-top:12px;transform:none">
+        ${resetSentEmail ? t('resend_reset') : t('send_reset')}
+      </button>
+      <div class="sync-foot mono">
+        <button class="sync-link" id="sync-back">${t('back_signin')}</button>
+      </div>`;
+  } else if (!status.enabled) {
     // After a successful Create account, Supabase sends a confirmation link and
     // returns no session yet — that's a SUCCESS, not an error. Show a friendly
     // (non-red) block, with the account's email prefilled for the next sign-in.
@@ -721,17 +750,6 @@ async function renderSync() {
           <button class="si-resend mono" id="sync-resend">${t('resend')}</button>
         </div>
       </div>` : '';
-    // Forgot-password success: Supabase accepted the reset request and (if the
-    // account exists) emailed a link. Friendly, non-red — mirrors confirmBlock.
-    const resetBlock = resetSentEmail ? `
-      <div class="sync-info">
-        <span class="si-ico">🔑</span>
-        <div class="si-text">
-          <b>${t('check_inbox')}</b>
-          <span class="si-body">${t('reset_body', esc(resetSentEmail))}</span>
-          <span class="si-hint mono">${t('reset_hint')}</span>
-        </div>
-      </div>` : '';
     const isSignup = syncMode === 'signup';
     // Sign-up only: confirm the password to catch typos before the account exists.
     // Always in the DOM (so it can animate); revealed once the password is typed.
@@ -741,7 +759,7 @@ async function renderSync() {
           <input id="sync-pw2" class="sync-input mono" type="password" placeholder="${t('ph_confirm_pw')}" autocomplete="new-password" />
         </div>
       </div>` : '';
-    // Sign-in only: a way out when the account password is forgotten.
+    // Sign-in only: a way out when the account password is forgotten → its own screen.
     const forgotLink = !isSignup ? `
       <div class="sync-foot mono" style="margin-top:8px">
         <button class="sync-link" id="sync-forgot">${t('forgot_pw')}</button>
@@ -749,7 +767,6 @@ async function renderSync() {
     body = `
       <div class="set-section mono">${isSignup ? t('create_account') : t('sign_in')}</div>
       ${confirmBlock}
-      ${resetBlock}
       <input id="sync-email" class="sync-input mono" type="email" placeholder="${t('ph_email')}" autocomplete="username" value="${esc(syncEmail)}" />
       <div class="sync-pw-wrap">
         <input id="sync-pw" class="sync-input mono has-reveal" type="password" placeholder="${t('ph_password')}" autocomplete="${isSignup ? 'new-password' : 'current-password'}" />
@@ -792,24 +809,31 @@ async function renderSync() {
   ov.onclick = (e) => { if (ov._downSelf && e.target === ov) closeSync(); };
   $('[data-done]', ov).onclick = closeSync;
 
-  if (!status.enabled) {
+  if (!status.enabled && syncMode === 'forgot') {
+    // ── Dedicated reset-password screen ──
     $('#sync-email', ov).oninput = (e) => { syncEmail = e.target.value; };
-    $('#sync-toggle', ov).onclick = () => { syncMode = syncMode === 'signup' ? 'signin' : 'signup'; confirmEmail = null; resetSentEmail = null; renderSync(); };
-    const forgot = $('#sync-forgot', ov);
-    if (forgot) forgot.onclick = async () => {
+    $('#sync-back', ov).onclick = () => { syncMode = 'signin'; resetSentEmail = null; renderSync(); };
+    const send = $('#sync-reset-send', ov);
+    send.onclick = async () => {
       const email = $('#sync-email', ov).value.trim();
       if (!email) return toast(t('toast_enter_email'));
       syncEmail = email;
-      forgot.disabled = true; forgot.textContent = t('sending');
+      send.disabled = true; send.textContent = t('sending');
       try {
         await api.recoverPassword(email);
         confirmEmail = null; resetSentEmail = email;
         renderSync();
       } catch (err) {
         toast(String(err.message).replace(/^AUTH_FAILED:\s*/, '') || t('reset_fail'));
-        forgot.disabled = false; forgot.textContent = t('forgot_pw');
+        send.disabled = false; send.textContent = resetSentEmail ? t('resend_reset') : t('send_reset');
       }
     };
+  } else if (!status.enabled) {
+    $('#sync-email', ov).oninput = (e) => { syncEmail = e.target.value; };
+    $('#sync-toggle', ov).onclick = () => { syncMode = syncMode === 'signup' ? 'signin' : 'signup'; confirmEmail = null; resetSentEmail = null; renderSync(); };
+    // "Forgot password?" → open the dedicated reset screen (carries the typed email).
+    const forgot = $('#sync-forgot', ov);
+    if (forgot) forgot.onclick = () => { syncMode = 'forgot'; confirmEmail = null; renderSync(); };
 
     // password field: reveal toggle + non-ASCII guard, and on sign-up slide the
     // "confirm password" field in once typing starts — all on one input handler.
@@ -887,7 +911,7 @@ async function renderSync() {
   }
 }
 function renderSyncError(msg) { const ov = $('#overlay-sync'); if (!ov) return; const m = ov.querySelector('.modal'); const e = document.createElement('div'); e.className = 'sync-err mono'; e.textContent = msg; m.appendChild(e); }
-function closeSync() { syncOpen = false; const ov = $('#overlay-sync'); if (ov) ov.remove(); }
+function closeSync() { syncOpen = false; syncMode = 'signin'; resetSentEmail = null; const ov = $('#overlay-sync'); if (ov) ov.remove(); }
 
 // ── onboarding (first run; scroll-driven narrative, replayable from settings) ────
 // UX from the SessionVault Prototype handoff (5 sections: hero · 3 steps · CTA,

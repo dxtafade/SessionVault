@@ -1,0 +1,163 @@
+<!doctype html>
+<!--
+  Public Privacy Policy page for the free, local-only Session Vault build.
+  Host it (GitHub Pages serves the repo /docs folder, so this is reachable at
+  .../SessionVault/privacy.html) and paste that URL into the Chrome Web Store
+  listing. Source of truth for the wording is docs/PRIVACY.md — keep them in sync.
+  Styled in the Session Vault "Flip Desk" language (see app/app.css).
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Privacy Policy · Session Vault</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Space+Mono:wght@400;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --desk:#E9E1D2; --paper:#FBF8F0; --ink:#17130C;
+      --sub:rgba(23,19,12,.62); --edge:rgba(23,19,12,.16);
+      --green:#2D9D78; --gold:#D9A431;
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0; min-height:100vh; padding:40px 20px;
+      background:var(--desk);
+      background-image:radial-gradient(rgba(23,19,12,.05) 1px, transparent 1.4px);
+      background-size:22px 22px;
+      color:var(--ink); font-family:"Archivo",system-ui,sans-serif;
+      display:flex; justify-content:center;
+    }
+    .mono { font-family:"Space Mono",ui-monospace,monospace; }
+    .sheet {
+      position:relative; background:var(--paper); border:2px solid var(--ink);
+      border-radius:16px; padding:40px clamp(22px,5vw,54px) 36px;
+      max-width:760px; width:100%;
+      box-shadow:9px 10px 0 rgba(23,19,12,.13);
+    }
+    .sheet::before {
+      content:""; position:absolute; left:-2px; right:-2px; top:-2px; height:10px;
+      background:var(--gold); border:2px solid var(--ink); border-bottom:none;
+      border-radius:16px 16px 0 0;
+    }
+    .brand { display:flex; align-items:center; gap:11px; margin-top:4px; }
+    .brand .word { font-weight:900; letter-spacing:-.02em; font-size:20px; text-transform:uppercase; }
+    .brand svg { display:block; flex:0 0 auto; }
+
+    h1 { font-size:clamp(30px,5vw,40px); font-weight:900; letter-spacing:-.03em; margin:22px 0 6px; line-height:1; }
+    .meta { font-size:12px; line-height:1.7; color:var(--sub); letter-spacing:.02em; }
+    .meta b { color:var(--ink); font-weight:700; }
+    .note {
+      margin:18px 0 6px; padding:12px 15px; border-left:3px solid var(--gold);
+      background:rgba(217,164,49,.08); font-size:13.5px; line-height:1.55; color:var(--sub);
+    }
+    h2 {
+      font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+      color:var(--ink); margin:30px 0 8px; font-family:"Space Mono",monospace;
+      padding-bottom:7px; border-bottom:2px solid var(--edge);
+    }
+    p { font-size:15px; line-height:1.65; color:#3a352c; margin:10px 0; }
+    p strong, li strong { color:var(--ink); font-weight:700; }
+    .lead { font-size:16px; color:var(--ink); }
+    table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14px; }
+    th, td { text-align:left; padding:9px 12px; border:1.5px solid var(--edge); vertical-align:top; }
+    th { background:rgba(23,19,12,.04); font-family:"Space Mono",monospace; font-size:12px; letter-spacing:.04em; text-transform:uppercase; }
+    td code { font-family:"Space Mono",monospace; background:rgba(23,19,12,.06); padding:1px 6px; border-radius:5px; font-size:13px; }
+    a { color:var(--green); }
+    .foot { margin-top:30px; padding-top:18px; border-top:2px solid var(--edge);
+            font-family:"Caveat",cursive; font-size:20px; color:var(--sub); text-align:center; }
+  </style>
+</head>
+<body>
+  <main class="sheet">
+    <div class="brand">
+      <svg width="32" height="32" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+        <g stroke="#17130C" stroke-width="2" stroke-linejoin="round">
+          <rect x="16" y="7" width="22" height="29" rx="4" fill="#FBF8F0"/>
+          <rect x="12" y="10.5" width="22" height="29" rx="4" fill="#FBF8F0"/>
+          <rect x="8" y="14" width="22" height="29" rx="4" fill="#FBF8F0"/>
+        </g>
+        <path d="M12 14 H26 a4 4 0 0 1 4 4 V20 H8 V18 a4 4 0 0 1 4 -4 Z" fill="#D9A431"/>
+        <g stroke="#17130C" stroke-width="2" fill="none"><rect x="8" y="14" width="22" height="29" rx="4"/></g>
+        <rect x="13" y="25" width="12" height="2.4" rx="1.2" fill="#17130C" opacity=".55"/>
+        <rect x="13" y="30" width="8" height="2.4" rx="1.2" fill="#17130C" opacity=".35"/>
+      </svg>
+      <span class="word">SessionVault</span>
+    </div>
+
+    <h1>Privacy Policy</h1>
+    <div class="meta mono">
+      Effective date: <b>15 June 2026</b><br>
+      Maintained by: <b>bachdevs</b> ("we", "us", "our")<br>
+      Contact: <b>sorrydinofake@gmail.com</b>
+    </div>
+
+    <div class="note">
+      This policy covers the current <strong>free, local-only</strong> version of Session Vault.
+      A future paid version may add optional cloud sync; this policy will be updated before any such feature ships.
+    </div>
+
+    <p class="lead">Session Vault saves and restores your browser tabs. <strong>Everything stays on your device.</strong>
+    There are no accounts, no sign-in, and no servers — your data is never uploaded anywhere. We do not sell your data, show ads, or track your browsing.</p>
+
+    <h2>1. Scope</h2>
+    <p>This policy applies to the <strong>Session Vault</strong> browser extension (free, local-only version).</p>
+
+    <h2>2. Information we handle</h2>
+    <p><strong>Session data you choose to save</strong> — the titles and URLs of your open tabs, and the folders, tags,
+    and project spaces you organize them into. This is created only when you (or the autosave feature, if you enable it)
+    save a session, and it is stored <strong>only on your device</strong>.</p>
+    <p><strong>What we do not collect:</strong> we collect <strong>nothing</strong> about you. No accounts, no email
+    address, no general browsing history, no page contents, no form inputs, no keystrokes, no IP-based tracking, and no
+    behavioral analytics. None of your data leaves your device.</p>
+
+    <h2>3. Where your data is stored</h2>
+    <p>All data is stored locally in your browser's extension storage (<code>chrome.storage.local</code>) on your own
+    device. It is <strong>never transmitted to us or to any third party.</strong> There is no remote server or cloud
+    component in this version.</p>
+
+    <h2>4. How we use your information</h2>
+    <p>Your saved sessions are used solely on your device to provide the extension's features: saving and restoring your
+    tabs. We have no access to this data. We do <strong>not</strong> sell or rent it, use it for advertising, or share
+    it with anyone.</p>
+
+    <h2>5. Service providers</h2>
+    <p><strong>None.</strong> This version has no backend and uses no third-party services to operate.</p>
+
+    <h2>6. Data retention and deletion</h2>
+    <p>Data is removed when you delete a session inside the extension, empty the bin, or uninstall the extension (which
+    clears its local storage). You can export your sessions to a file at any time from within the extension.</p>
+
+    <h2>7. Security</h2>
+    <p>Because your data never leaves your device, it is protected by your operating system and browser. No security
+    measure is perfect, but there is no remote copy of your data for us or anyone else to expose.</p>
+
+    <h2>8. Your rights</h2>
+    <p>All of your data lives on your device and is fully under your control — you can view, export, or delete it at any
+    time from within the extension. <strong>We do not collect or sell personal information.</strong></p>
+
+    <h2>9. Children</h2>
+    <p>Session Vault is not directed to children under 13 (or the minimum age in your jurisdiction) and we do not
+    knowingly collect their data.</p>
+
+    <h2>10. Permissions the extension requests</h2>
+    <table>
+      <tr><th>Permission</th><th>Why it's needed</th></tr>
+      <tr><td><code>tabs</code></td><td>Read the titles and URLs of your open tabs so you can save and restore them</td></tr>
+      <tr><td><code>storage</code></td><td>Save your sessions locally in the browser</td></tr>
+      <tr><td><code>alarms</code></td><td>Run the optional autosave timer on your device</td></tr>
+    </table>
+
+    <h2>11. Changes to this policy</h2>
+    <p>We may update this policy; material changes will be reflected by updating the effective date above and, where
+    appropriate, an in-product notice.</p>
+
+    <h2>12. Contact</h2>
+    <p>Questions or data requests: <a href="mailto:sorrydinofake@gmail.com">sorrydinofake@gmail.com</a>.</p>
+
+    <div class="foot">Never lose your tabs again</div>
+  </main>
+</body>
+</html>

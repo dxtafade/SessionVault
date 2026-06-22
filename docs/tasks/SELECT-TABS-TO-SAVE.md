@@ -1,5 +1,11 @@
 # Задание Dexter — выбор вкладок при сохранении (engine: GET_OPEN_TABS + SAVE_SESSION.tabIds)
 
+> ✅ **ВЫПОЛНЕНО** (2026-06-22, by Lucik по просьбе владельца — реализовано за Dexter).
+> `background/service-worker.js`: добавлен `GET_OPEN_TABS`, `SAVE_SESSION` принимает
+> `tabIds`, `saveCurrentSession(name, isAuto, tabIds)` фильтрует по общему ключу
+> `openTabId = ${windowIndex}:${index}`. Доки обновлены (шапка SW + README). Dexter,
+> при желании — отревьюй движковую часть; UI уже совместим.
+
 ## Контекст
 UI «＋ Save open tabs» теперь открывает **пикер вкладок**: список открытых вкладок
 с чекбоксами, выбор папки, «save N tabs» (юзер кладёт, например, только Telegram +

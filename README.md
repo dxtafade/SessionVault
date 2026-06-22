@@ -32,12 +32,18 @@ Preview it standalone (mock mode): `python3 -m http.server -d app 8123`.
 All communication goes through `chrome.runtime.sendMessage`.
 
 ```js
+// List the currently open tabs (for a "choose which tabs to save" picker).
+// Each tab has a stable id you pass back to SAVE_SESSION.tabIds.
+const { tabs } = await chrome.runtime.sendMessage({ action: 'GET_OPEN_TABS' });
+// tabs: [{ id, url, title, favIconUrl, pinned }]
+
 // Save the current tabs as a named session
 // FREE PLAN: throws an error starting with 'FREE_LIMIT_REACHED' once the user
 // has 50 saved sessions — catch it and show an upgrade/clean-up prompt.
+// tabIds (optional): save only those open tabs (from GET_OPEN_TABS); omit = save all.
 const { session } = await chrome.runtime.sendMessage({
   action: 'SAVE_SESSION',
-  payload: { name: 'Work — Monday' }
+  payload: { name: 'Work — Monday', tabIds: ['0:2', '0:5'] }  // tabIds optional
 });
 
 // List all saved sessions

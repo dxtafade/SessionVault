@@ -5,7 +5,8 @@
  * Talks to Storage via storage.js and exposes a message API for the UI.
  *
  * Message API (chrome.runtime.sendMessage / popup → engine):
- *   { action: 'SAVE_SESSION',      payload: { name } }              → { session }   (free: throws 'FREE_LIMIT_REACHED: …' at 50 saved)
+ *   { action: 'GET_OPEN_TABS' }                                      → { tabs: [{ id, url, title, favIconUrl, pinned }] }   (open tabs, for the save picker)
+ *   { action: 'SAVE_SESSION',      payload: { name, tabIds? } }     → { session }   (free: throws 'FREE_LIMIT_REACHED: …' at 50 saved; tabIds = save only those open tabs, omit = all)
  *   { action: 'RESTORE_SESSION',   payload: { id } }                → { ok }
  *   { action: 'RESTORE_TAB',       payload: { url } }               → { ok }   (opens one tab)
  *   { action: 'DELETE_SESSION',    payload: { id, force? } }        → { ok }   (soft delete → trash)
@@ -224,8 +225,17 @@ async function captureCurrentTabs() {
 
 // ─── Core actions ─────────────────────────────────────────────────────────────
 
-async function saveCurrentSession(name, isAuto = false) {
-  const tabs = await captureCurrentTabs();
+// Stable per-open-tab id used by the save-tabs picker (GET_OPEN_TABS → SAVE_SESSION).
+// MUST stay identical in both places or the subset filter won't match.
+const openTabId = (t) => `${t.windowIndex}:${t.index}`;
+
+// `tabIds` (optional): save only the open tabs whose id is in the list; omit to save all.
+async function saveCurrentSession(name, isAuto = false, tabIds = null) {
+  let tabs = await captureCurrentTabs();
+  if (Array.isArray(tabIds)) {
+    const keep = new Set(tabIds);
+    tabs = tabs.filter((t) => keep.has(openTabId(t)));
+  }
   const now = Date.now();
   const session = {
     id: generateId(),
@@ -415,9 +425,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 async function handleMessage({ action, payload = {} }) {
   switch (action) {
 
+    case 'GET_OPEN_TABS': {
+      // List the currently open tabs so the UI can let the user pick a subset.
+      const tabs = await captureCurrentTabs();
+      return { tabs: tabs.map((t) => ({
+        id: openTabId(t), url: t.url, title: t.title, favIconUrl: t.favIconUrl, pinned: t.pinned,
+      })) };
+    }
+
     case 'SAVE_SESSION': {
       await assertCanSaveManual();
-      const session = await saveCurrentSession(payload.name ?? 'Unnamed session');
+      // payload.tabIds (optional) → save only those open tabs; omit → save all.
+      const session = await saveCurrentSession(payload.name ?? 'Unnamed session', false, payload.tabIds);
       return { session };
     }
 

@@ -225,6 +225,35 @@ body { background: var(--desk, #E9E1D2); }
 .modal-center { position: absolute; inset: 0; background: var(--overlay); backdrop-filter: blur(8px); z-index: 80; display: flex; align-items: center; justify-content: center; animation: fade .25s ease both; }
 .modal { width: 560px; max-width: 92vw; background: var(--paper); border: 2px solid var(--ink); border-radius: 14px; box-shadow: var(--dragShadow); padding: 30px 34px 26px; max-height: 86vh; overflow: auto; transform: rotate(-.4deg); animation: pop .4s var(--spring) both; }
 .modal-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+
+/* ── save-tabs picker ─────────────────────────────────────────────────────── */
+.sp-folder { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.sp-into { font-size: 10px; letter-spacing: .16em; color: var(--sub); flex: 0 0 auto; }
+.sp-select {
+  flex: 1; padding: 9px 11px; border: 2px solid var(--ink); border-radius: 8px;
+  background: var(--paper); color: var(--ink); font-size: 13px; outline: none; cursor: pointer;
+}
+.sp-select:focus { box-shadow: 2px 2px 0 var(--sub); }
+.sp-bar { display: flex; align-items: center; gap: 12px; margin: 14px 0 6px; font-size: 11px; letter-spacing: .04em; color: var(--sub); }
+.sp-bar .sync-link { color: var(--ink); }
+.sp-list {
+  max-height: 320px; overflow-y: auto; border: 2px solid var(--ink); border-radius: 10px;
+  background: var(--desk); padding: 5px;
+}
+.sp-row {
+  display: flex; align-items: center; gap: 11px; padding: 8px 9px; border-radius: 8px; cursor: pointer;
+  transition: background .12s;
+}
+.sp-row:hover { background: var(--paperEdge); }
+.sp-cb { width: 17px; height: 17px; flex: 0 0 auto; accent-color: var(--ink); cursor: pointer; }
+.sp-fav {
+  width: 26px; height: 26px; border-radius: 6px; flex: 0 0 auto; color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
+}
+.sp-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.sp-title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-dom { font-size: 10px; letter-spacing: .04em; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-pin { font-size: 8px; letter-spacing: .1em; color: var(--sub); border: 1.5px solid var(--paperEdge); border-radius: 4px; padding: 2px 5px; flex: 0 0 auto; }
 .set-section { font-size: 10px; letter-spacing: .18em; color: var(--sub); margin: 18px 0 2px; }
 .set-row { display: flex; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--paperEdge); }
 .set-row .label { flex: 1; }

@@ -378,20 +378,104 @@ async function onRecover() {
   }
 }
 
+function defaultSessionName() {
+  return `Session — ${new Date().toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+}
+
 async function onSquash() {
-  const name = prompt('Name this session:', `Session — ${new Date().toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
+  let tabs = [];
+  // Newer engine lets us list the open tabs so the user can pick a subset.
+  try { tabs = await api.getOpenTabs(); } catch { tabs = []; }
+  if (tabs && tabs.length) return openSavePicker(tabs);
+  return legacySaveAll(); // older engine (no GET_OPEN_TABS) → save everything, as before
+}
+
+// Fallback: save all open tabs (the original prompt-based flow).
+async function legacySaveAll() {
+  const name = prompt('Name this session:', defaultSessionName());
   if (name === null) return;
+  await saveTabs(name || 'Open tabs', activeShelf === UNFILED ? null : activeShelf, undefined, null);
+}
+
+// Shared save → move-to-folder → refresh + toast. `ids` undefined = save all.
+async function saveTabs(name, folderId, ids, onErr) {
   try {
-    const folderId = activeShelf === UNFILED ? null : activeShelf;
-    const s = await api.saveSession(name || 'Open tabs', folderId);
+    const s = await api.saveSession(name, folderId, ids);
     if (s && folderId && s.folderId !== folderId) await api.moveSessionToFolder(s.id, folderId);
+    if (folderId) activeShelf = folderId;
     await refresh();
-    toast('✓ open tabs saved as a new session');
+    const n = ids ? ids.length : (s?.tabs?.length ?? 0);
+    const where = folderId ? ' → ' + (state.folders[folderId]?.name || '').toUpperCase() : '';
+    toast(`✓ saved ${n} tab${n === 1 ? '' : 's'}${where}`);
+    return true;
   } catch (err) {
     if (String(err.message).startsWith('FREE_LIMIT_REACHED')) toast('Free limit reached (50). Delete some or upgrade to Pro.');
     else toast('Could not save: ' + err.message);
+    if (onErr) onErr();
+    return false;
   }
 }
+
+// Picker: choose which open tabs to save (and into which shelf).
+function openSavePicker(tabs) {
+  const selected = new Set(tabs.map((t) => t.id));
+  const defFolder = activeShelf === UNFILED ? '' : activeShelf;
+  let ov = $('#overlay-save');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'overlay-save'; ov.className = 'modal-center'; app.appendChild(ov); }
+
+  const folderOpts = ['<option value="">Unfiled</option>']
+    .concat(Object.values(state.folders).map((f) =>
+      `<option value="${esc(f.id)}"${f.id === defFolder ? ' selected' : ''}>${esc(f.name)}</option>`)).join('');
+
+  const rowHTML = (t) => {
+    const dom = domainOf(t.url), initial = (dom[0] || '?').toUpperCase();
+    return `<label class="sp-row" data-id="${esc(t.id)}">
+        <input type="checkbox" class="sp-cb" ${selected.has(t.id) ? 'checked' : ''} />
+        <span class="sp-fav" style="background:${colorFor(dom)}">${esc(initial)}</span>
+        <span class="sp-info"><span class="sp-title">${esc(t.title || dom)}</span><span class="sp-dom mono">${esc(dom)}</span></span>
+        ${t.pinned ? '<span class="sp-pin mono">PIN</span>' : ''}
+      </label>`;
+  };
+
+  ov.innerHTML = `<div class="modal" style="width:480px">
+      <div class="modal-head"><span class="black" style="font-size:26px">SAVE OPEN TABS</span><span style="flex:1"></span><button class="actbtn" data-cancel>CANCEL</button></div>
+      <input id="sp-name" class="sync-input mono" type="text" value="${esc(defaultSessionName())}" placeholder="session name" />
+      <div class="sp-folder mono"><span class="sp-into">INTO</span><select id="sp-folder" class="sp-select mono">${folderOpts}</select></div>
+      <div class="sp-bar mono"><span id="sp-count"></span><span style="flex:1"></span><button class="sync-link" id="sp-all">All</button><button class="sync-link" id="sp-none">None</button></div>
+      <div class="sp-list">${tabs.map(rowHTML).join('')}</div>
+      <button class="btn-squash tactile" id="sp-save" style="width:100%;margin-top:14px;transform:none"></button>
+    </div>`;
+  ov.hidden = false;
+
+  const update = () => {
+    $('#sp-count', ov).textContent = `${selected.size} of ${tabs.length} selected`;
+    const btn = $('#sp-save', ov);
+    btn.textContent = `＋ SAVE ${selected.size} TAB${selected.size === 1 ? '' : 'S'}`;
+    btn.disabled = selected.size === 0;
+  };
+  update();
+
+  ov.onpointerdown = (e) => { ov._downSelf = (e.target === ov); };
+  ov.onclick = (e) => { if (ov._downSelf && e.target === ov) closeSave(); };
+  $('[data-cancel]', ov).onclick = closeSave;
+  ov.querySelectorAll('.sp-row').forEach((row) => {
+    const cb = $('.sp-cb', row), id = row.dataset.id;
+    cb.onchange = () => { cb.checked ? selected.add(id) : selected.delete(id); update(); };
+  });
+  $('#sp-all', ov).onclick = () => { tabs.forEach((t) => selected.add(t.id)); ov.querySelectorAll('.sp-cb').forEach((c) => c.checked = true); update(); };
+  $('#sp-none', ov).onclick = () => { selected.clear(); ov.querySelectorAll('.sp-cb').forEach((c) => c.checked = false); update(); };
+  $('#sp-save', ov).onclick = async () => {
+    if (!selected.size) return;
+    const name = $('#sp-name', ov).value.trim() || 'Open tabs';
+    const folderId = $('#sp-folder', ov).value || null;
+    const ids = tabs.filter((t) => selected.has(t.id)).map((t) => t.id);
+    const btn = $('#sp-save', ov); btn.disabled = true; btn.textContent = 'SAVING…';
+    // all selected → omit ids so the engine saves everything (back-compat)
+    const ok = await saveTabs(name, folderId, ids.length === tabs.length ? undefined : ids, () => { btn.disabled = false; update(); });
+    if (ok) closeSave();
+  };
+}
+function closeSave() { const ov = $('#overlay-save'); if (ov) ov.remove(); }
 
 async function onAddFolder() {
   const name = prompt('New shelf name:');
@@ -966,6 +1050,7 @@ function finishOnboarding() {
 // ── global keys ───────────────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if ($('#overlay-save')) return closeSave();
     if ($('#overlay-spread')) return closeSpread();
     if ($('#overlay-trash')) return closeTrash();
     if ($('#overlay-settings')) return closeSettings();

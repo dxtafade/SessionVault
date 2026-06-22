@@ -87,6 +87,21 @@ function load() {
 function save(s) { try { localStorage.setItem(MOCK_KEY, JSON.stringify(s)); } catch (e) {} }
 const genId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+// Stand-in "currently open tabs" for the preview, so the save-tabs picker is
+// demoable without the extension. Each tab has a stable id for selection.
+function mockOpenTabs() {
+  return [
+    { id: 't1', url: 'https://web.telegram.org/a/', title: 'Telegram Web', favIconUrl: '', pinned: false },
+    { id: 't2', url: 'https://www.facebook.com/', title: 'Facebook', favIconUrl: '', pinned: false },
+    { id: 't3', url: 'https://twitter.com/home', title: 'X / Home', favIconUrl: '', pinned: false },
+    { id: 't4', url: 'https://www.youtube.com/watch?v=lofi', title: 'lofi hip hop radio — YouTube', favIconUrl: '', pinned: false },
+    { id: 't5', url: 'https://github.com/dxtafade/SessionVault', title: 'dxtafade/SessionVault · GitHub', favIconUrl: '', pinned: true },
+    { id: 't6', url: 'https://mail.google.com/mail/u/0/', title: 'Inbox (3) — Gmail', favIconUrl: '', pinned: false },
+    { id: 't7', url: 'https://news.ycombinator.com/', title: 'Hacker News', favIconUrl: '', pinned: false },
+    { id: 't8', url: 'https://www.figma.com/file/abc/SessionVault', title: 'SessionVault UI — Figma', favIconUrl: '', pinned: false },
+  ];
+}
+
 // Mirrors storage/crypto.js assessPassphrase so the preview indicator matches.
 function mockAssess(passphrase) {
   const pass = String(passphrase ?? ''); const len = pass.length;
@@ -113,11 +128,17 @@ async function sendMock(action, payload = {}) {
         totalTabs: list.reduce((n, s) => n + s.tabs.length, 0), trashCount: Object.keys(db.trash).length,
         usage: { used: 0, quota: 10485760, percent: 0 } } };
     }
+    case 'GET_OPEN_TABS': return { tabs: mockOpenTabs() };
     case 'SAVE_SESSION': {
       const id = genId();
+      // If tabIds are given, save only those open tabs; otherwise save them all.
+      const open = mockOpenTabs();
+      const picked = Array.isArray(payload.tabIds)
+        ? open.filter((t) => payload.tabIds.includes(t.id))
+        : open;
+      const tabs = picked.map((t, i) => ({ url: t.url, title: t.title, favIconUrl: t.favIconUrl, pinned: t.pinned, index: i }));
       const s = { id, name: payload.name || 'Open tabs', folderId: payload.folderId ?? null,
-        createdAt: now, updatedAt: now, isAuto: false,
-        tabs: [{ url: 'https://example.com', title: 'Current tab', favIconUrl: '', pinned: false, index: 0 }] };
+        createdAt: now, updatedAt: now, isAuto: false, tabs };
       db.sessions[id] = s; save(db); return { session: s };
     }
     case 'RESTORE_SESSION': case 'RESTORE_TAB': return { ok: true };
@@ -198,7 +219,12 @@ export const getTrash = async () => (await send('GET_TRASH')).trash ?? {};
 export const getSettings = async () => (await send('GET_SETTINGS')).settings ?? {};
 export const getStats = async () => (await send('GET_STORAGE_STATS')).stats ?? null;
 
-export const saveSession = async (name, folderId) => (await send('SAVE_SESSION', { name, folderId })).session;
+// Currently open browser tabs, for the "save selected tabs" picker.
+// Each: { id, url, title, favIconUrl, pinned }. (Engine: GET_OPEN_TABS — see store handoff.)
+export const getOpenTabs = async () => (await send('GET_OPEN_TABS')).tabs ?? [];
+// tabIds (optional): save only those open tabs; omit to save them all (back-compat).
+export const saveSession = async (name, folderId, tabIds) =>
+  (await send('SAVE_SESSION', { name, folderId, ...(tabIds ? { tabIds } : {}) })).session;
 export const restoreSession = (id) => send('RESTORE_SESSION', { id });
 export const restoreTab = (url) => send('RESTORE_TAB', { url });
 export const deleteSession = (id) => send('DELETE_SESSION', { id });

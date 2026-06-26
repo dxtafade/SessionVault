@@ -41,6 +41,9 @@ const I18N = {
     name_session: "Name this session:", session_default: "Session — {0}", open_tabs_fallback: "Open tabs",
     saved_ok: "✓ open tabs saved as a new session",
     free_limit: "Free limit reached (50). Delete some or upgrade to Pro.", save_fail: "Could not save: {0}",
+    saved_tabs: "✓ saved {0} tabs{1}",
+    save_open_tabs: "SAVE OPEN TABS", cancel: "CANCEL", session_name_ph: "session name", into: "INTO",
+    all_btn: "All", none_btn: "None", sel_count: "{0} of {1} selected", save_n: "＋ SAVE {0} TABS", saving: "SAVING…",
     new_shelf_name: "New shelf name:",
     cards_dealt: "{0} cards dealt", restore_all_btn: "↗ RESTORE ALL", share_btn: "⤴ SHARE",
     bin_it: "× BIN IT", restack: "RESTACK ↩", open_this: "Open this tab",
@@ -114,6 +117,9 @@ const I18N = {
     name_session: "Назовите сессию:", session_default: "Сессия — {0}", open_tabs_fallback: "Открытые вкладки",
     saved_ok: "✓ вкладки сохранены в новую сессию",
     free_limit: "Достигнут лимит (50). Удалите часть или перейдите на Pro.", save_fail: "Не удалось сохранить: {0}",
+    saved_tabs: "✓ сохранено вкладок: {0}{1}",
+    save_open_tabs: "СОХРАНИТЬ ВКЛАДКИ", cancel: "ОТМЕНА", session_name_ph: "название сессии", into: "В ПОЛКУ",
+    all_btn: "Все", none_btn: "Нет", sel_count: "{0} из {1} выбрано", save_n: "＋ СОХРАНИТЬ {0}", saving: "СОХРАНЯЮ…",
     new_shelf_name: "Название новой полки:",
     cards_dealt: "{0} карт разложено", restore_all_btn: "↗ ВЕРНУТЬ ВСЕ", share_btn: "⤴ ПОДЕЛИТЬСЯ",
     bin_it: "× В КОРЗИНУ", restack: "СЛОЖИТЬ ↩", open_this: "Открыть вкладку",
@@ -544,20 +550,104 @@ async function onRecover() {
   }
 }
 
+function defaultSessionName() {
+  return t('session_default', new Date().toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
+}
+
 async function onSquash() {
-  const name = prompt(t('name_session'), t('session_default', new Date().toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })));
+  let tabs = [];
+  // Newer engine lets us list the open tabs so the user can pick a subset.
+  try { tabs = await api.getOpenTabs(); } catch { tabs = []; }
+  if (tabs && tabs.length) return openSavePicker(tabs);
+  return legacySaveAll(); // older engine (no GET_OPEN_TABS) → save everything, as before
+}
+
+// Fallback: save all open tabs (the original prompt-based flow).
+async function legacySaveAll() {
+  const name = prompt(t('name_session'), defaultSessionName());
   if (name === null) return;
+  await saveTabs(name || t('open_tabs_fallback'), activeShelf === UNFILED ? null : activeShelf, undefined, null);
+}
+
+// Shared save → move-to-folder → refresh + toast. `ids` undefined = save all.
+async function saveTabs(name, folderId, ids, onErr) {
   try {
-    const folderId = activeShelf === UNFILED ? null : activeShelf;
-    const s = await api.saveSession(name || t('open_tabs_fallback'), folderId);
+    const s = await api.saveSession(name, folderId, ids);
     if (s && folderId && s.folderId !== folderId) await api.moveSessionToFolder(s.id, folderId);
+    if (folderId) activeShelf = folderId;
     await refresh();
-    toast(t('saved_ok'));
+    const n = ids ? ids.length : (s?.tabs?.length ?? 0);
+    const where = folderId ? ' → ' + (state.folders[folderId]?.name || '').toUpperCase() : '';
+    toast(t('saved_tabs', n, where));
+    return true;
   } catch (err) {
     if (String(err.message).startsWith('FREE_LIMIT_REACHED')) toast(t('free_limit'));
     else toast(t('save_fail', err.message));
+    if (onErr) onErr();
+    return false;
   }
 }
+
+// Picker: choose which open tabs to save (and into which shelf).
+function openSavePicker(tabs) {
+  const selected = new Set(tabs.map((t) => t.id));
+  const defFolder = activeShelf === UNFILED ? '' : activeShelf;
+  let ov = $('#overlay-save');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'overlay-save'; ov.className = 'modal-center'; app.appendChild(ov); }
+
+  const folderOpts = [`<option value="">${esc(t('unfiled'))}</option>`]
+    .concat(Object.values(state.folders).map((f) =>
+      `<option value="${esc(f.id)}"${f.id === defFolder ? ' selected' : ''}>${esc(f.name)}</option>`)).join('');
+
+  const rowHTML = (t) => {
+    const dom = domainOf(t.url), initial = (dom[0] || '?').toUpperCase();
+    return `<label class="sp-row" data-id="${esc(t.id)}">
+        <input type="checkbox" class="sp-cb" ${selected.has(t.id) ? 'checked' : ''} />
+        <span class="sp-fav" style="background:${colorFor(dom)}">${esc(initial)}</span>
+        <span class="sp-info"><span class="sp-title">${esc(t.title || dom)}</span><span class="sp-dom mono">${esc(dom)}</span></span>
+        ${t.pinned ? '<span class="sp-pin mono">PIN</span>' : ''}
+      </label>`;
+  };
+
+  ov.innerHTML = `<div class="modal" style="width:480px">
+      <div class="modal-head"><span class="black" style="font-size:26px">${esc(t('save_open_tabs'))}</span><span style="flex:1"></span><button class="actbtn" data-cancel>${esc(t('cancel'))}</button></div>
+      <input id="sp-name" class="sync-input mono" type="text" value="${esc(defaultSessionName())}" placeholder="${esc(t('session_name_ph'))}" />
+      <div class="sp-folder mono"><span class="sp-into">${esc(t('into'))}</span><select id="sp-folder" class="sp-select mono">${folderOpts}</select></div>
+      <div class="sp-bar mono"><span id="sp-count"></span><span style="flex:1"></span><button class="sync-link" id="sp-all">${esc(t('all_btn'))}</button><button class="sync-link" id="sp-none">${esc(t('none_btn'))}</button></div>
+      <div class="sp-list">${tabs.map(rowHTML).join('')}</div>
+      <button class="btn-squash tactile" id="sp-save" style="width:100%;margin-top:14px;transform:none"></button>
+    </div>`;
+  ov.hidden = false;
+
+  const update = () => {
+    $('#sp-count', ov).textContent = t('sel_count', selected.size, tabs.length);
+    const btn = $('#sp-save', ov);
+    btn.textContent = t('save_n', selected.size);
+    btn.disabled = selected.size === 0;
+  };
+  update();
+
+  ov.onpointerdown = (e) => { ov._downSelf = (e.target === ov); };
+  ov.onclick = (e) => { if (ov._downSelf && e.target === ov) closeSave(); };
+  $('[data-cancel]', ov).onclick = closeSave;
+  ov.querySelectorAll('.sp-row').forEach((row) => {
+    const cb = $('.sp-cb', row), id = row.dataset.id;
+    cb.onchange = () => { cb.checked ? selected.add(id) : selected.delete(id); update(); };
+  });
+  $('#sp-all', ov).onclick = () => { tabs.forEach((t) => selected.add(t.id)); ov.querySelectorAll('.sp-cb').forEach((c) => c.checked = true); update(); };
+  $('#sp-none', ov).onclick = () => { selected.clear(); ov.querySelectorAll('.sp-cb').forEach((c) => c.checked = false); update(); };
+  $('#sp-save', ov).onclick = async () => {
+    if (!selected.size) return;
+    const name = $('#sp-name', ov).value.trim() || t('open_tabs_fallback');
+    const folderId = $('#sp-folder', ov).value || null;
+    const ids = tabs.filter((t) => selected.has(t.id)).map((t) => t.id);
+    const btn = $('#sp-save', ov); btn.disabled = true; btn.textContent = t('saving');
+    // all selected → omit ids so the engine saves everything (back-compat)
+    const ok = await saveTabs(name, folderId, ids.length === tabs.length ? undefined : ids, () => { btn.disabled = false; update(); });
+    if (ok) closeSave();
+  };
+}
+function closeSave() { const ov = $('#overlay-save'); if (ov) ov.remove(); }
 
 async function onAddFolder() {
   const name = prompt(t('new_shelf_name'));
@@ -1132,6 +1222,7 @@ function finishOnboarding() {
 // ── global keys ───────────────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if ($('#overlay-save')) return closeSave();
     if ($('#overlay-spread')) return closeSpread();
     if ($('#overlay-trash')) return closeTrash();
     if ($('#overlay-settings')) return closeSettings();

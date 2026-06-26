@@ -5,7 +5,8 @@
  * Talks to Storage via storage.js and exposes a message API for the UI.
  *
  * Message API (chrome.runtime.sendMessage / popup → engine):
- *   { action: 'SAVE_SESSION',      payload: { name, closeTabs? } }  → { session }   (free: throws 'FREE_LIMIT_REACHED: …' at 50 saved; closes the saved tabs unless closeTabs:false — pinned + the desk page are kept)
+ *   { action: 'GET_OPEN_TABS' }                                      → { tabs: [{ id, url, title, favIconUrl, pinned }] }   (open tabs, for the save picker)
+ *   { action: 'SAVE_SESSION',      payload: { name, tabIds?, closeTabs? } } → { session }   (free: throws 'FREE_LIMIT_REACHED: …' at 50 saved; tabIds = save only those open tabs, omit = all; also closes the saved tabs unless closeTabs:false — pinned spared when saving all, the desk page always kept)
  *   { action: 'RESTORE_SESSION',   payload: { id } }                → { ok }
  *   { action: 'RESTORE_TAB',       payload: { url } }               → { ok }   (opens one tab)
  *   { action: 'DELETE_SESSION',    payload: { id, force? } }        → { ok }   (soft delete → trash)
@@ -225,24 +226,37 @@ async function captureCurrentTabs() {
 // Close the currently-open tabs after a MANUAL save — "save open tabs" = clear the
 // browser so the user doesn't have to close everything by hand. Only touches the
 // same restoreable tabs we capture (chrome-extension://, chrome://, etc. are in
-// SKIP_SCHEMES, so the extension's own desk page stays open). Pinned tabs are
-// spared (saved but left open). Best-effort: a failure here never fails the save.
-// NOT used by autosave (which calls saveCurrentSession directly).
-async function closeOpenTabs() {
+// SKIP_SCHEMES, so the extension's own desk page stays open). `tabIds` mirrors the
+// save picker (openTabId scheme): when given, close exactly those; when omitted
+// (save all), close everything restoreable but spare pinned tabs. Best-effort: a
+// failure here never fails the save. NOT used by autosave.
+async function closeOpenTabs(tabIds) {
   const windows = await chrome.windows.getAll({ populate: true, windowTypes: ['normal'] });
+  const wanted = Array.isArray(tabIds) ? new Set(tabIds) : null;
   const ids = [];
-  for (const win of windows) {
-    for (const t of win.tabs) {
-      if (isRestoreable(t.url) && !t.pinned && typeof t.id === 'number') ids.push(t.id);
-    }
-  }
+  windows.forEach((win, windowIndex) => {
+    win.tabs.forEach((t) => {
+      if (typeof t.id !== 'number' || !isRestoreable(t.url)) return;
+      if (wanted) { if (wanted.has(openTabId({ windowIndex, index: t.index }))) ids.push(t.id); }
+      else if (!t.pinned) ids.push(t.id);
+    });
+  });
   if (ids.length) { try { await chrome.tabs.remove(ids); } catch (_) {} }
 }
 
 // ─── Core actions ─────────────────────────────────────────────────────────────
 
-async function saveCurrentSession(name, isAuto = false) {
-  const tabs = await captureCurrentTabs();
+// Stable per-open-tab id used by the save-tabs picker (GET_OPEN_TABS → SAVE_SESSION).
+// MUST stay identical in both places or the subset filter won't match.
+const openTabId = (t) => `${t.windowIndex}:${t.index}`;
+
+// `tabIds` (optional): save only the open tabs whose id is in the list; omit to save all.
+async function saveCurrentSession(name, isAuto = false, tabIds = null) {
+  let tabs = await captureCurrentTabs();
+  if (Array.isArray(tabIds)) {
+    const keep = new Set(tabIds);
+    tabs = tabs.filter((t) => keep.has(openTabId(t)));
+  }
   const now = Date.now();
   const session = {
     id: generateId(),
@@ -432,11 +446,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 async function handleMessage({ action, payload = {} }) {
   switch (action) {
 
+    case 'GET_OPEN_TABS': {
+      // List the currently open tabs so the UI can let the user pick a subset.
+      const tabs = await captureCurrentTabs();
+      return { tabs: tabs.map((t) => ({
+        id: openTabId(t), url: t.url, title: t.title, favIconUrl: t.favIconUrl, pinned: t.pinned,
+      })) };
+    }
+
     case 'SAVE_SESSION': {
       await assertCanSaveManual();
-      const session = await saveCurrentSession(payload.name ?? 'Unnamed session');
-      // "Save open tabs" clears the browser too (unless the caller opts out).
-      if (payload.closeTabs !== false) await closeOpenTabs();
+      // payload.tabIds (optional) → save only those open tabs; omit → save all.
+      const session = await saveCurrentSession(payload.name ?? 'Unnamed session', false, payload.tabIds);
+      // "Save open tabs" clears the browser too: close the saved tabs (unless opted out).
+      if (payload.closeTabs !== false) await closeOpenTabs(payload.tabIds);
       return { session };
     }
 

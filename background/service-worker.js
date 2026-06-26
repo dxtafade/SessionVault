@@ -5,7 +5,7 @@
  * Talks to Storage via storage.js and exposes a message API for the UI.
  *
  * Message API (chrome.runtime.sendMessage / popup → engine):
- *   { action: 'SAVE_SESSION',      payload: { name } }              → { session }   (free: throws 'FREE_LIMIT_REACHED: …' at 50 saved)
+ *   { action: 'SAVE_SESSION',      payload: { name, closeTabs? } }  → { session }   (free: throws 'FREE_LIMIT_REACHED: …' at 50 saved; closes the saved tabs unless closeTabs:false — pinned + the desk page are kept)
  *   { action: 'RESTORE_SESSION',   payload: { id } }                → { ok }
  *   { action: 'RESTORE_TAB',       payload: { url } }               → { ok }   (opens one tab)
  *   { action: 'DELETE_SESSION',    payload: { id, force? } }        → { ok }   (soft delete → trash)
@@ -222,6 +222,23 @@ async function captureCurrentTabs() {
   return tabs;
 }
 
+// Close the currently-open tabs after a MANUAL save — "save open tabs" = clear the
+// browser so the user doesn't have to close everything by hand. Only touches the
+// same restoreable tabs we capture (chrome-extension://, chrome://, etc. are in
+// SKIP_SCHEMES, so the extension's own desk page stays open). Pinned tabs are
+// spared (saved but left open). Best-effort: a failure here never fails the save.
+// NOT used by autosave (which calls saveCurrentSession directly).
+async function closeOpenTabs() {
+  const windows = await chrome.windows.getAll({ populate: true, windowTypes: ['normal'] });
+  const ids = [];
+  for (const win of windows) {
+    for (const t of win.tabs) {
+      if (isRestoreable(t.url) && !t.pinned && typeof t.id === 'number') ids.push(t.id);
+    }
+  }
+  if (ids.length) { try { await chrome.tabs.remove(ids); } catch (_) {} }
+}
+
 // ─── Core actions ─────────────────────────────────────────────────────────────
 
 async function saveCurrentSession(name, isAuto = false) {
@@ -418,6 +435,8 @@ async function handleMessage({ action, payload = {} }) {
     case 'SAVE_SESSION': {
       await assertCanSaveManual();
       const session = await saveCurrentSession(payload.name ?? 'Unnamed session');
+      // "Save open tabs" clears the browser too (unless the caller opts out).
+      if (payload.closeTabs !== false) await closeOpenTabs();
       return { session };
     }
 

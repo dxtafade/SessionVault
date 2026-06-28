@@ -288,10 +288,28 @@ async function restoreSession(id) {
     byWindow.get(wi).push(tab);
   }
 
-  for (const [, tabs] of [...byWindow.entries()].sort((a, b) => a[0] - b[0])) {
-    const sorted = tabs.slice().sort((a, b) => a.index - b.index);
-    const win = await chrome.windows.create({ url: sorted[0].url });
+  const groups = [...byWindow.entries()].sort((a, b) => a[0] - b[0]);
 
+  // Open the FIRST window's tabs into the user's current window (no jarring extra
+  // Chrome window). Any additional windows the session spanned still open as their
+  // own windows, preserving a multi-window layout.
+  let currentWindowId = null;
+  try {
+    const w = await chrome.windows.getLastFocused({ windowTypes: ['normal'] });
+    currentWindowId = w?.id ?? null;
+  } catch (_) {}
+
+  for (let gi = 0; gi < groups.length; gi++) {
+    const sorted = groups[gi][1].slice().sort((a, b) => a.index - b.index);
+
+    if (gi === 0 && currentWindowId != null) {
+      for (const tab of sorted) {
+        await chrome.tabs.create({ windowId: currentWindowId, url: tab.url, pinned: tab.pinned });
+      }
+      continue;
+    }
+
+    const win = await chrome.windows.create({ url: sorted[0].url });
     for (const tab of sorted.slice(1)) {
       await chrome.tabs.create({ windowId: win.id, url: tab.url, pinned: tab.pinned });
     }
@@ -384,9 +402,19 @@ async function updateEmergencySnapshot() {
 }
 
 // On browser startup, freeze the previous session's tabs as the recovery
-// candidate BEFORE live tab events overwrite the emergency snapshot.
+// candidate BEFORE live tab events overwrite the emergency snapshot — but ONLY if
+// the last run didn't end cleanly. Chrome doesn't tell extensions whether it
+// crashed, so we infer it: CLEAN_EXIT_KEY is set true when the last browser window
+// closes (a normal quit) and reset to false here for the new run. If it was true,
+// the browser closed normally → no crash → don't offer recovery (and clear any
+// stale candidate). If it's false/absent → likely a crash/kill → offer recovery.
+const CLEAN_EXIT_KEY = 'cleanExit';
+
 async function captureRecoveryCandidate() {
-  const { [EMERGENCY_KEY]: snap } = await chrome.storage.local.get(EMERGENCY_KEY);
+  const { [CLEAN_EXIT_KEY]: cleanExit, [EMERGENCY_KEY]: snap } =
+    await chrome.storage.local.get([CLEAN_EXIT_KEY, EMERGENCY_KEY]);
+  await chrome.storage.local.set({ [CLEAN_EXIT_KEY]: false }); // new run = "running"
+  if (cleanExit) { await chrome.storage.local.remove(RECOVERY_KEY); return; } // normal restart
   if (snap && Array.isArray(snap.tabs) && snap.tabs.length > 0) {
     await chrome.storage.local.set({ [RECOVERY_KEY]: { tabs: snap.tabs, savedAt: snap.savedAt } });
   }
@@ -396,6 +424,16 @@ chrome.tabs.onRemoved.addListener(() => updateEmergencySnapshot());
 chrome.tabs.onCreated.addListener(() => updateEmergencySnapshot());
 chrome.tabs.onUpdated.addListener((_id, info) => {
   if (info.status === 'complete') updateEmergencySnapshot();
+});
+
+// Crash heuristic: when the LAST normal window closes, the browser is quitting
+// normally — mark a clean exit so the next launch won't show a recovery prompt.
+// A crash/kill never fires this, so the flag stays false → recovery is offered.
+chrome.windows.onRemoved.addListener(async () => {
+  try {
+    const wins = await chrome.windows.getAll({ windowTypes: ['normal'] });
+    if (wins.length === 0) await chrome.storage.local.set({ [CLEAN_EXIT_KEY]: true });
+  } catch (_) {}
 });
 
 // Flush before the service worker goes idle

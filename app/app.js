@@ -196,11 +196,13 @@ function ageOf(ms) {
   return t('age_now');
 }
 
-// default desk slots for stacks, by index
+// default desk slots for stacks, by index. Y starts well below the header/meta
+// (~130) so a fresh card (e.g. the first one in a new folder) never lands under
+// the SESSIONVAULT title.
 const POS = [
-  { x: 96, y: 40, r: -3 }, { x: 404, y: 236, r: 2.5 }, { x: 706, y: 36, r: -1.5 },
-  { x: 1018, y: 220, r: 3 }, { x: 770, y: 362, r: -2.5 }, { x: 150, y: 330, r: 2 },
-  { x: 470, y: 22, r: -2 }, { x: 980, y: 22, r: 1.5 },
+  { x: 96, y: 150, r: -3 }, { x: 404, y: 320, r: 2.5 }, { x: 706, y: 146, r: -1.5 },
+  { x: 1018, y: 300, r: 3 }, { x: 770, y: 430, r: -2.5 }, { x: 150, y: 412, r: 2 },
+  { x: 470, y: 136, r: -2 }, { x: 980, y: 132, r: 1.5 },
 ];
 
 const UNFILED = '__unfiled__';

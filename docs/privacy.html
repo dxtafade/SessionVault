@@ -15,11 +15,30 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Space+Mono:wght@400;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
   <style>
+    @font-face {
+      font-family:"Unbounded Cyrillic";
+      font-style:normal;
+      font-weight:400 900;
+      font-display:swap;
+      src:url("fonts/unbounded-cyrillic.woff2") format("woff2");
+      unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116;
+    }
+    @font-face {
+      font-family:"Unbounded Cyrillic";
+      font-style:normal;
+      font-weight:400 900;
+      font-display:swap;
+      src:url("fonts/unbounded-cyrillic-ext.woff2") format("woff2");
+      unicode-range:U+0460-052F,U+1C80-1C8A,U+20B4,U+2DE0-2DFF,U+A640-A69F,U+FE2E-FE2F;
+    }
     :root {
       color-scheme: light;
       --desk:#E9E1D2; --paper:#FBF8F0; --ink:#17130C;
       --sub:rgba(23,19,12,.62); --edge:rgba(23,19,12,.16);
       --green:#2D9D78; --gold:#D9A431;
+      --font-sans:"Unbounded Cyrillic","Archivo",system-ui,sans-serif;
+      --font-mono:"Unbounded Cyrillic","Space Mono",ui-monospace,monospace;
+      --font-hand:"Unbounded Cyrillic","Caveat",cursive;
     }
     * { box-sizing:border-box; }
     body {
@@ -27,10 +46,10 @@
       background:var(--desk);
       background-image:radial-gradient(rgba(23,19,12,.05) 1px, transparent 1.4px);
       background-size:22px 22px;
-      color:var(--ink); font-family:"Archivo",system-ui,sans-serif;
+      color:var(--ink); font-family:var(--font-sans);
       display:flex; justify-content:center;
     }
-    .mono { font-family:"Space Mono",ui-monospace,monospace; }
+    .mono { font-family:var(--font-mono); }
     .sheet {
       position:relative; background:var(--paper); border:2px solid var(--ink);
       border-radius:16px; padding:40px clamp(22px,5vw,54px) 36px;
@@ -55,7 +74,7 @@
     }
     h2 {
       font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
-      color:var(--ink); margin:30px 0 8px; font-family:"Space Mono",monospace;
+      color:var(--ink); margin:30px 0 8px; font-family:var(--font-mono);
       padding-bottom:7px; border-bottom:2px solid var(--edge);
     }
     p { font-size:15px; line-height:1.65; color:#3a352c; margin:10px 0; }
@@ -63,11 +82,11 @@
     .lead { font-size:16px; color:var(--ink); }
     table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14px; }
     th, td { text-align:left; padding:9px 12px; border:1.5px solid var(--edge); vertical-align:top; }
-    th { background:rgba(23,19,12,.04); font-family:"Space Mono",monospace; font-size:12px; letter-spacing:.04em; text-transform:uppercase; }
-    td code { font-family:"Space Mono",monospace; background:rgba(23,19,12,.06); padding:1px 6px; border-radius:5px; font-size:13px; }
+    th { background:rgba(23,19,12,.04); font-family:var(--font-mono); font-size:12px; letter-spacing:.04em; text-transform:uppercase; }
+    td code { font-family:var(--font-mono); background:rgba(23,19,12,.06); padding:1px 6px; border-radius:5px; font-size:13px; }
     a { color:var(--green); }
     .foot { margin-top:30px; padding-top:18px; border-top:2px solid var(--edge);
-            font-family:"Caveat",cursive; font-size:20px; color:var(--sub); text-align:center; }
+            font-family:var(--font-hand); font-size:20px; color:var(--sub); text-align:center; }
   </style>
 </head>
 <body>

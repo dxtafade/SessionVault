@@ -29,6 +29,17 @@ async function sendReal(action, payload = {}) {
 // ─── Mock backend (preview only) ──────────────────────────────────────────────────
 
 const MOCK_KEY = 'sv_app_mock';
+const FORCE_RECOVERY_DEMO =
+  typeof location !== 'undefined' &&
+  new URLSearchParams(location.search).has('recovery');
+
+function mockRecovery(savedAt = Date.now() - 5 * 60000) {
+  return { savedAt, tabs: [
+    { url: 'https://news.ycombinator.com', title: 'Hacker News', favIconUrl: '', pinned: false, index: 0 },
+    { url: 'https://github.com/dashboard', title: 'GitHub · Dashboard', favIconUrl: '', pinned: false, index: 1 },
+    { url: 'https://mail.google.com', title: 'Inbox (3) — Mail', favIconUrl: '', pinned: false, index: 2 },
+  ] };
+}
 
 function seed() {
   const now = Date.now();
@@ -72,11 +83,7 @@ function seed() {
     trash: {},
     settings: { autosaveEnabled: true, autosaveInterval: 10, maxAutoSessions: 5 },
     // Stand-in crash-recovery candidate so the prompt is demoable in preview.
-    recovery: { savedAt: now - 5 * 60000, tabs: [
-      { url: 'https://news.ycombinator.com', title: 'Hacker News', favIconUrl: '', pinned: false, index: 0 },
-      { url: 'https://github.com/dashboard', title: 'GitHub · Dashboard', favIconUrl: '', pinned: false, index: 1 },
-      { url: 'https://mail.google.com', title: 'Inbox (3) — Mail', favIconUrl: '', pinned: false, index: 2 },
-    ] },
+    recovery: mockRecovery(now - 5 * 60000),
   };
 }
 
@@ -190,7 +197,7 @@ async function sendMock(action, payload = {}) {
     case 'GET_RECOVERY': {
       // Peek, no side effects (the preview can't see real open tabs, so the
       // whole candidate counts as "missing").
-      const cand = db.recovery;
+      const cand = FORCE_RECOVERY_DEMO ? mockRecovery(now - 5 * 60000) : db.recovery;
       if (!cand || !cand.tabs?.length) return { recovery: { available: false, tabCount: 0, missingCount: 0, savedAt: null } };
       return { recovery: { available: true, tabCount: cand.tabs.length, missingCount: cand.tabs.length, savedAt: cand.savedAt } };
     }

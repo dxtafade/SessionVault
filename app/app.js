@@ -751,12 +751,14 @@ function renderSettings() {
   const seg = (key, opts) => `<div class="seg">${opts.map(([v, label]) => `<button class="${prefs[key] === v ? 'on' : ''}" data-seg="${key}" data-val="${v}">${label}</button>`).join('')}</div>`;
   const toggle = (key, on) => `<button class="toggle ${on ? 'on' : ''}" data-toggle="${key}"><i></i></button>`;
   ov.innerHTML = `
-    <div class="modal">
+    <div class="modal settings-modal">
       <div class="modal-head">
-        <span class="black" style="font-size:34px">${t('settings_title')}</span>
+        <span class="black settings-title">${t('settings_title')}</span>
         <span style="flex:1"></span>
-        <button class="actbtn" data-replay>${t('replay_intro')}</button>
-        <button class="actbtn" data-done>${t('done')}</button>
+        <div class="settings-actions">
+          <button class="actbtn" data-replay>${t('replay_intro')}</button>
+          <button class="actbtn" data-done>${t('done')}</button>
+        </div>
       </div>
 
       <div class="set-section mono">${t('appearance')}</div>

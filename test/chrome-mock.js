@@ -70,7 +70,16 @@ export function createChromeMock() {
     },
   };
 
-  return { storage: { local } };
+  // Minimal chrome.runtime. The manifest carries NO `update_url`, so
+  // entitlements.isDevBuild() treats the test environment as an unpacked/dev
+  // build (which it effectively is) — matching how the extension runs locally.
+  const runtime = {
+    id: 'session-vault-test',
+    getManifest: () => ({ manifest_version: 3, name: 'Session Vault', version: '0.1.0' }),
+    getURL: (path = '') => `chrome-extension://session-vault-test/${path}`,
+  };
+
+  return { storage: { local }, runtime };
 }
 
 /** Installs a fresh mock on globalThis.chrome and returns it. */

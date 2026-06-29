@@ -38,4 +38,17 @@ describe('entitlements', () => {
     const { FREE_SESSION_LIMIT } = await load();
     expect(FREE_SESSION_LIMIT).toBe(50);
   });
+
+  it('setPro is a no-op in a store build (manifest carries update_url)', async () => {
+    // A Web Store build has an update_url; flipping Pro must NOT be possible via
+    // a client-side message there — only through real entitlement validation.
+    chrome.runtime.getManifest = () => ({
+      manifest_version: 3,
+      update_url: 'https://clients2.google.com/service/update2/crx',
+    });
+    const { setPro, isPro, isDevBuild } = await load();
+    expect(isDevBuild()).toBe(false);
+    await setPro(true);
+    expect(await isPro()).toBe(false);
+  });
 });

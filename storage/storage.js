@@ -735,7 +735,7 @@ function isValidSmartFolder(sf) {
 function _pickValid(map, validate) {
   const out = {};
   for (const [id, v] of Object.entries(map ?? {})) {
-    if (validate(v)) out[id] = v;
+    if (validate(v)) out[id] = ('color' in v) ? { ...v, color: sanitizeColor(v.color) } : v;
   }
   return out;
 }

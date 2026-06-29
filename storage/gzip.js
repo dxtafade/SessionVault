@@ -17,14 +17,45 @@ export async function gzipString(text) {
   return new Uint8Array(buf);
 }
 
-/** Decompresses gzip bytes back into a string. */
-export async function gunzipToString(bytes) {
+/**
+ * Hard cap on decompressed output. A gzip stream can expand by ~1000x, so a
+ * few-KB malicious backup file could otherwise inflate to gigabytes and exhaust
+ * memory. 64 MB is far beyond any legitimate vault export.
+ */
+export const MAX_DECOMPRESSED_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Decompresses gzip bytes back into a string. Streams the output and aborts as
+ * soon as it exceeds MAX_DECOMPRESSED_BYTES, so a decompression bomb cannot
+ * blow up memory before we'd otherwise buffer the whole thing.
+ */
+export async function gunzipToString(bytes, maxBytes = MAX_DECOMPRESSED_BYTES) {
   const ds = new DecompressionStream('gzip');
   const writer = ds.writable.getWriter();
   writer.write(bytes);
   writer.close();
-  const buf = await new Response(ds.readable).arrayBuffer();
-  return new TextDecoder().decode(buf);
+
+  const reader = ds.readable.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error('Decompressed data exceeds the maximum allowed size');
+    }
+    chunks.push(value);
+  }
+
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    merged.set(c, offset);
+    offset += c.byteLength;
+  }
+  return new TextDecoder().decode(merged);
 }
 
 // ─── base64 (chunk-safe; works in SW / popup / Node) ─────────────────────────────

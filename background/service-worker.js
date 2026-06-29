@@ -471,7 +471,13 @@ chrome.alarms.onAlarm.addListener(async alarm => {
 
 // ─── Message API ──────────────────────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Only accept messages from our own extension pages (popup/app). There are no
+  // content scripts and no externally_connectable, so anything with a foreign
+  // sender.id — or a sender.url that isn't one of our own pages — is rejected.
+  if (sender.id !== chrome.runtime.id) return false;
+  if (sender.url && !sender.url.startsWith(chrome.runtime.getURL(''))) return false;
+
   handleMessage(message)
     .then(sendResponse)
     .catch(err => {

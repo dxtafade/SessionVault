@@ -37,10 +37,30 @@ export async function isPro() {
 }
 
 /**
- * Dev/stub setter. Replace with real licence activation later.
- * Returns the updated entitlements.
+ * True when running an unpacked/dev build. Store builds carry an `update_url`
+ * in the runtime manifest; unpacked builds loaded via "Load unpacked" do not.
+ * Used to keep the `SET_PRO` dev toggle from being a free paywall bypass once
+ * the extension ships from the Web Store.
+ */
+export function isDevBuild() {
+  try {
+    return !('update_url' in chrome.runtime.getManifest());
+  } catch {
+    return false; // fail closed — treat unknown environments as production
+  }
+}
+
+/**
+ * Dev-only stub setter — replace with real licence activation later. In a
+ * store build this is a no-op: flipping Pro must go through real entitlement
+ * validation, not a client-side message, otherwise anyone can unlock Pro by
+ * sending SET_PRO from the console. Returns the (unchanged in prod) entitlements.
  */
 export async function setPro(pro) {
+  if (!isDevBuild()) {
+    console.warn('[SessionVault] SET_PRO ignored: not a dev build');
+    return getEntitlements();
+  }
   const next = { ...(await getEntitlements()), pro: pro === true };
   await chrome.storage.local.set({ [ENTITLEMENTS_KEY]: next });
   return next;

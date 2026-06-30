@@ -10,6 +10,11 @@ import * as api from './api.js';
 const $ = (sel, root = document) => root.querySelector(sel);
 const app = $('#app');
 
+// v1 ships free + local-only. Cloud sync (accounts, e-mail registration, encrypted
+// multi-device sync) is fully built but hidden behind this flag — flip to true to
+// bring it back with the paid tier. All sync code/strings stay in place.
+const CLOUD_SYNC_ENABLED = false;
+
 // ── tiny helpers ──────────────────────────────────────────────────────────────
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -339,7 +344,7 @@ function render() {
             ${isPro() ? '∞ PRO' : `${savedCount()}<span class="sep">/</span>${freeLimit()}`}
           </div>
           <button class="btn-gear btn-lang tactile mono" id="lang" title="${t('language')}">${prefs.lang === 'ru' ? 'RU' : 'EN'}</button>
-          <button class="btn-gear tactile" id="cloud" title="${t('cloud_sync')}">☁</button>
+          ${CLOUD_SYNC_ENABLED ? `<button class="btn-gear tactile" id="cloud" title="${t('cloud_sync')}">☁</button>` : ''}
           <button class="btn-gear tactile" id="gear" title="${t('settings')}">⚙</button>
         </div>
       </div>
@@ -433,7 +438,7 @@ function wireDesk() {
   $('#search').oninput = (e) => { query = e.target.value; updateDim(); };
   $('#squash').onclick = onSquash;
   $('#gear').onclick = () => { settingsOpen = true; renderSettings(); };
-  $('#cloud').onclick = () => { syncOpen = true; renderSync(); };
+  { const c = $('#cloud'); if (c) c.onclick = () => { syncOpen = true; renderSync(); }; }
   $('#lang').onclick = () => {
     prefs.lang = prefs.lang === 'ru' ? 'en' : 'ru'; savePrefs(); applyPrefs();
     render();

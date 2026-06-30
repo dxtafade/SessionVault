@@ -81,6 +81,15 @@ body { background: var(--desk, #E9E1D2); }
 #app[data-lang="ru"] .btn-lang { font-family: var(--font-mono-base); }
 #app[data-lang="ru"] .empty .h,
 #app[data-lang="ru"] .empty .b { font-family: var(--font-hand-base); }
+/* RU onboarding chrome/brand uses the base mono (like the app's RU chrome) so the
+   English words (SESSIONVAULT…) don't render in a different font than the Cyrillic
+   around them — single, consistent line. Headings/body keep the display font. */
+#app[data-lang="ru"] .onb-micro,
+#app[data-lang="ru"] .onb-wordmark,
+#app[data-lang="ru"] .onb-logo,
+#app[data-lang="ru"] .onb-num,
+#app[data-lang="ru"] .onb-rail,
+#app[data-lang="ru"] .onb-hint { font-family: var(--font-mono-base); }
 
 /* ── Folder-tab rail ───────────────────────────────────────────────────────── */
 .rail {
@@ -518,6 +527,7 @@ body { background: var(--desk, #E9E1D2); }
 
 /* fixed chrome */
 .onb-logo { position: fixed; top: 22px; left: 26px; font-size: 12px; letter-spacing: .28em; color: var(--ink); z-index: 2; }
+.onb-lang { position: fixed; bottom: 22px; right: 26px; z-index: 3; }
 .onb-skip {
   position: fixed; top: 18px; right: 24px; z-index: 2;
   border: 2px solid var(--ink); background: var(--paper); color: var(--ink);

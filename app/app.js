@@ -1171,6 +1171,7 @@ function renderOnboarding() {
     </div>
 
     <div class="onb-logo mono">SESSIONVAULT</div>
+    <button class="onb-lang btn-gear btn-lang tactile mono" id="onb-lang" title="${t('language')}">${prefs.lang === 'ru' ? 'RU' : 'EN'}</button>
     <button class="onb-skip" id="onb-skip">${t('skip')}</button>
     <div class="onb-rail mono"><span id="onb-rail-cur">01</span><span class="bar"><i id="onb-rail-fill"></i></span><span>0${ONB_SECTIONS}</span></div>
     <div class="onb-hint mono" id="onb-hint"><span class="line"></span> ${t('scroll_more')}</div>
@@ -1222,6 +1223,9 @@ function renderOnboarding() {
   const collectArt = ov.querySelector('.onb-collect');
   if (collectArt) collectArt.onclick = () => collectArt.classList.toggle('playing');
 
+  $('#onb-lang', ov).onclick = () => {
+    prefs.lang = prefs.lang === 'ru' ? 'en' : 'ru'; savePrefs(); applyPrefs(); renderOnboarding();
+  };
   $('#onb-skip', ov).onclick = finishOnboarding;
   $('#onb-start', ov).onclick = finishOnboarding;
 }

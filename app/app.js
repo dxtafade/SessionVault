@@ -1017,7 +1017,10 @@ function closeSync() { syncOpen = false; syncMode = 'signin'; resetSentEmail = n
 // scroll-snapped with word-by-word reveal + parallax art), reskinned to our
 // design language (manila cards, ink, Archivo/Space Mono).
 const ONB_KEY = 'sv_app_onboarded';
-const ONB_SECTIONS = 5;
+// 5 sections (hero · 3 steps · CTA) with cloud sync; without it the sync step
+// (03 "Everywhere you go") is dropped → 4 sections, so we never promise a feature
+// the build doesn't have.
+const ONB_SECTIONS = CLOUD_SYNC_ENABLED ? 5 : 4;
 const ONB_TAGS = [
   { label: 'work', c: '#2D9D78', x: -120, y: -64, r: -10 },
   { label: 'research', c: '#3A86C8', x: 122, y: -48, r: 8 },
@@ -1144,7 +1147,7 @@ function renderOnboarding() {
     </div>`;
 
   ov.innerHTML = `
-    <div class="onb-track">
+    <div class="onb-track" style="height:${(ONB_SECTIONS - 1) * 50 + 100}vh">
       <div class="onb-stage">
         <div class="onb-sec onb-sec-hero">
           <div>
@@ -1156,7 +1159,7 @@ function renderOnboarding() {
         </div>
         ${step('01', t('onb1_t'), t('onb1_b'), onbArtCollect())}
         ${step('02', t('onb2_t'), t('onb2_b'), onbArtSort())}
-        ${step('03', t('onb3_t'), t('onb3_b'), onbArtSync())}
+        ${CLOUD_SYNC_ENABLED ? step('03', t('onb3_t'), t('onb3_b'), onbArtSync()) : ''}
         <div class="onb-sec onb-sec-cta">
           <div class="onb-cta-inner">
             <div class="onb-wordmark mono onb-r" style="--d:40ms">SESSIONVAULT</div>

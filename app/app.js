@@ -1173,7 +1173,7 @@ function renderOnboarding() {
     <div class="onb-logo mono">SESSIONVAULT</div>
     <button class="onb-lang btn-gear btn-lang tactile mono" id="onb-lang" title="${t('language')}">${prefs.lang === 'ru' ? 'RU' : 'EN'}</button>
     <button class="onb-skip" id="onb-skip">${t('skip')}</button>
-    <div class="onb-rail mono"><span id="onb-rail-cur">01</span><span class="bar"><i id="onb-rail-fill"></i></span><span>0${ONB_SECTIONS}</span></div>
+    <div class="onb-rail mono"><span id="onb-rail-cur">01</span><span class="bar"><i id="onb-rail-fill"></i></span><span>0${ONB_SECTIONS - 1}</span></div>
     <div class="onb-hint mono" id="onb-hint"><span class="line"></span> ${t('scroll_more')}</div>
   `;
   ov.hidden = false;
@@ -1199,8 +1199,12 @@ function renderOnboarding() {
         art.classList.add('playing');                            // 03 sync + hero: play immediately
       }
     });
-    $('#onb-rail-cur', ov).textContent = String(Math.min(n + 1, ONB_SECTIONS)).padStart(2, '0');
-    $('#onb-rail-fill', ov).style.width = `${(n / (ONB_SECTIONS - 1)) * 100}%`;
+    // The hero is the cover, not a "scroll" — count the sections after it, so the
+    // rail reads 1..(N-1) (e.g. 4 sections → "01/03"), matching what users count.
+    const railTotal = ONB_SECTIONS - 1;
+    const railCur = Math.min(n + 1, railTotal);
+    $('#onb-rail-cur', ov).textContent = String(railCur).padStart(2, '0');
+    $('#onb-rail-fill', ov).style.width = `${((railCur - 1) / Math.max(1, railTotal - 1)) * 100}%`;
     $('#onb-hint', ov).style.opacity = n >= ONB_SECTIONS - 1 ? '0' : '1';
   };
 
